@@ -10,20 +10,20 @@
   web/ (React) ── src/lib/scoring.ts ── computes points, tree stage, leaderboard
 ```
 
-The backend is intentionally undecided. For the demo, the web app reads mock data from `web/src/data/mock.ts`. Good next options: Supabase/Firebase (auth + realtime voting), or a small FastAPI service next to the pipeline.
+**No backend yet.** `web/src/store.tsx` keeps all data in `localStorage` and syncs every open window on the same computer through the `storage` event, so the demo feels live. Each window has its own signed-in user (`sessionStorage`). Passwords are SHA-256 hashed client-side, which is **demo-only, not secure**. Next step: Supabase or Firebase for auth + realtime, keeping `lib/` unchanged.
 
 ## Data model
 
+Types live in `web/src/lib/types.ts`.
+
 | Entity | Fields |
 |---|---|
-| `User` | id, name, school?, groupIds |
-| `Group` | id, name, location, memberIds, createdAt |
-| `ActivityLog` | id, groupId, placeName, category, date, attendeeIds, emoji |
-| `EventProposal` | id, groupId, title, place, proposedAt (time), createdAt, votes, status (`open`/`confirmed`/`cancelled`) |
-| `Vote` | userId, choice (`yes`/`no`/`alt`), altTime? |
-
-Types live in `web/src/lib/types.ts`.
+| `User` | id, username (unique), email, phone, passHash, displayName, region, school?, friendIds |
+| `Group` | id, name, region, hood, school?, createdAt, memberIds (2–8), plan, pastPlans |
+| `Plan` | id, title, where, date, time, note, byId, createdAt, confirmedAt?, inIds, outIds, suggestions |
+| `Suggestion` | id, byId, date, time, voterIds |
+| `ActivityLog` | id, groupId, authorId, title, description, cat, emoji, labels, date, where, attendeeIds, media, eventId?, points |
 
 ## Design
 
-Tree / natural / green theme. Colors are CSS variables in `web/src/index.css`.
+From `make-it-out.html`: monochrome, card-based UI with a dotted background; styles in `web/src/index.css`.

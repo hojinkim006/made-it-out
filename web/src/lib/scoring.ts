@@ -1,17 +1,79 @@
-import type { ActivityLog, EventProposal, Group, NichenessTable } from "./types";
+import type { ActivityLog, Cat, Competitor, Group, Plan, PointBreakdown } from "./types";
+import { daysBetween, monthKey, parseD, todayISO } from "./dates";
 
-// Tunable constants. Keep docs/SCORING.md in sync.
-export const BASE_POINTS = 10;
-export const NICHE_MAX_BONUS = 40;
-export const FIRST_TIME_BONUS = 15;
-export const HOLIDAY_MULTIPLIER = 1.5;
-export const DEFAULT_NICHENESS = 0.5;
+/*
+ * Scoring rules. Keep docs/SCORING.md in sync.
+ * Factors, largest share of points first:
+ *   nicheness > group turnout > finalization speed > Krillion bonus > holiday bonus
+ */
+export const NICHE_MAX = 100;
+export const TURNOUT_MAX = 60;
+export const SPEED_MAX = 40;
+export const KRILLION_BONUS = 30;
+export const HOLIDAY_BONUS = 20;
+/** Plans confirmed after this many hours earn no speed points. */
+export const SPEED_WINDOW_H = 72;
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const MIN_GROUP = 2;
+export const MAX_GROUP = 8;
 
-function parseDay(iso: string): Date {
-  // Treat date-only strings as local dates (avoid UTC off-by-one).
-  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + "T12:00:00") : new Date(iso);
+export const CATS: Record<Cat, { label: string; emoji: string; niche: number }> = {
+  water: { label: "Water", emoji: "🛶", niche: 0.85 },
+  art: { label: "Art", emoji: "🎨", niche: 0.6 },
+  outdoors: { label: "Outdoors", emoji: "🥾", niche: 0.6 },
+  music: { label: "Music", emoji: "🎷", niche: 0.5 },
+  sports: { label: "Sports", emoji: "⛸️", niche: 0.4 },
+  games: { label: "Games", emoji: "🎲", niche: 0.3 },
+  food: { label: "Food", emoji: "🍜", niche: 0.12 },
+  coffee: { label: "Coffee", emoji: "☕", niche: 0.05 },
+};
+
+/**
+ * Label nicheness in [0, 1]. Will be replaced by pipeline output
+ * (data/processed/nicheness.json). Unknown labels don't change the score.
+ */
+export const LABEL_NICHE: Record<string, number> = {
+  restaurant: 0.08,
+  cafe: 0.05,
+  bar: 0.15,
+  museum: 0.5,
+  hike: 0.55,
+  concert: 0.45,
+  bowling: 0.45,
+  "escape-room": 0.7,
+  climbing: 0.65,
+  pottery: 0.8,
+  kayak: 0.85,
+  "axe-throwing": 0.9,
+  festival: 0.75,
+};
+
+export const normLabel = (s: string) =>
+  s
+    .trim()
+    .toLowerCase()
+    .replace(/^#+/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+
+export function nicheness(cat: Cat, labels: string[]): number {
+  const fromLabels = labels.map((l) => LABEL_NICHE[normLabel(l)] ?? 0);
+  return Math.max(CATS[cat].niche, ...fromLabels);
+}
+
+/** Nonlinear in the share of the group that showed up, so 2 of 8 can't farm points. */
+export function turnoutPoints(attendees: number, members: number): number {
+  if (members <= 0 || attendees <= 0) return 0;
+  const share = Math.min(1, attendees / members);
+  return Math.round(TURNOUT_MAX * share * share);
+}
+
+/** Faster from "posted" to "locked in" = more points. */
+export function speedPoints(plan: Pick<Plan, "createdAt" | "confirmedAt"> | undefined): number {
+  if (!plan?.confirmedAt) return 0;
+  const hours = (new Date(plan.confirmedAt).getTime() - new Date(plan.createdAt).getTime()) / 36e5;
+  if (hours < 0) return 0;
+  return Math.round(SPEED_MAX * Math.max(0, 1 - hours / SPEED_WINDOW_H));
 }
 
 /** Nth weekday of a month, e.g. 4th Thursday of November. weekday: 0=Sun. */
@@ -20,131 +82,211 @@ function nthWeekday(year: number, month: number, weekday: number, n: number): nu
   return 1 + ((weekday - first + 7) % 7) + (n - 1) * 7;
 }
 
-/** Returns the holiday name if the date is a "special day", otherwise null. */
-export function holidayFor(isoDate: string): string | null {
-  const d = parseDay(isoDate);
-  const m = d.getMonth(); // 0-based
+export function holidayFor(date: string): string | null {
+  const d = parseD(date);
+  const m = d.getMonth();
   const day = d.getDate();
   const y = d.getFullYear();
-
   if (m === 11 && day >= 20 && day <= 26) return "Christmas";
   if ((m === 11 && day === 31) || (m === 0 && day === 1)) return "New Year";
   if (m === 10 && day === nthWeekday(y, 10, 4, 4)) return "Thanksgiving";
   if (m === 9 && day === 31) return "Halloween";
   if (m === 6 && day === 4) return "Independence Day";
   if (m === 1 && day === 14) return "Valentine's Day";
+  if (m === 2 && day === 17) return "St. Patrick's Day";
   return null;
 }
 
-export function nichenessOf(category: string, table: NichenessTable): number {
-  const v = table[category.toLowerCase()];
-  if (v === undefined || Number.isNaN(v)) return DEFAULT_NICHENESS;
-  return Math.min(1, Math.max(0, v));
-}
-
-export interface PointBreakdown {
-  base: number;
-  niche: number;
-  firstTime: number;
-  holiday: string | null;
-  total: number;
-}
+/** The "activity" a log represents: its first label, else its category. */
+export const activityKey = (log: Pick<ActivityLog, "labels" | "cat">) =>
+  log.labels.length ? normLabel(log.labels[0]) : log.cat;
 
 /**
- * Points for one logged activity.
- * @param priorLogs earlier logs for the same group (used for the first-time bonus)
+ * Krillion bonus: nobody in the whole app has logged this activity yet this month.
+ * @param earlier every log in the database saved before this one
  */
-export function scoreActivity(
-  log: ActivityLog,
-  priorLogs: ActivityLog[],
-  table: NichenessTable,
+export function isKrillion(
+  log: Pick<ActivityLog, "labels" | "cat" | "date">,
+  earlier: Pick<ActivityLog, "labels" | "cat" | "date">[],
+): boolean {
+  const key = activityKey(log);
+  const month = monthKey(log.date);
+  return !earlier.some((l) => monthKey(l.date) === month && activityKey(l) === key);
+}
+
+export function scoreLog(
+  log: Pick<ActivityLog, "cat" | "labels" | "date" | "attendeeIds">,
+  memberCount: number,
+  earlier: Pick<ActivityLog, "labels" | "cat" | "date">[],
+  plan?: Pick<Plan, "createdAt" | "confirmedAt">,
 ): PointBreakdown {
-  const niche = Math.round(nichenessOf(log.category, table) * NICHE_MAX_BONUS);
-  const isFirst = !priorLogs.some(
-    (p) => p.groupId === log.groupId && p.category.toLowerCase() === log.category.toLowerCase(),
-  );
-  const firstTime = isFirst ? FIRST_TIME_BONUS : 0;
-  const holiday = holidayFor(log.date);
-  const subtotal = BASE_POINTS + niche + firstTime;
-  const total = Math.round(holiday ? subtotal * HOLIDAY_MULTIPLIER : subtotal);
-  return { base: BASE_POINTS, niche, firstTime, holiday, total };
+  const niche = Math.round(nicheness(log.cat, log.labels) * NICHE_MAX);
+  const turnout = turnoutPoints(log.attendeeIds.length, memberCount);
+  const speed = speedPoints(plan);
+  const krillion = isKrillion(log, earlier) ? KRILLION_BONUS : 0;
+  const holidayName = holidayFor(log.date);
+  const holiday = holidayName ? HOLIDAY_BONUS : 0;
+  return { niche, turnout, speed, krillion, holiday, holidayName, total: niche + turnout + speed + krillion + holiday };
 }
 
-/** Bonus for confirming an event proposal quickly. */
-export function organizationBonus(event: EventProposal): number {
-  if (event.status !== "confirmed" || !event.confirmedAt) return 0;
-  const hours = (new Date(event.confirmedAt).getTime() - new Date(event.createdAt).getTime()) / 36e5;
-  if (hours < 0) return 0;
-  if (hours <= 24) return 20;
-  if (hours <= 72) return 10;
-  return 0;
+/* ---------------- streaks, decay, tree health ---------------- */
+
+export interface Health {
+  dailyStreak: number; // consecutive days with a log, ending today or yesterday
+  weeklyStreak: number; // consecutive 7-day windows with a log, ending today
+  daysSinceLast: number | null;
+  streakBonus: number;
+  decay: number;
+  /** Green leaves on the tree. Streaks add them, decay removes them first. */
+  leaves: number;
+  /** Tree scale multiplier once decay has taken every leaf (1 = full size). */
+  shrink: number;
+  status: "Thriving" | "Healthy" | "Quiet" | "Wilting" | "Dormant" | "New";
 }
 
-/** Total score for a group: all activity points + organization bonuses. */
-export function groupScore(
-  groupId: string,
-  logs: ActivityLog[],
-  events: EventProposal[],
-  table: NichenessTable,
-): number {
-  const own = logs
-    .filter((l) => l.groupId === groupId)
-    .sort((a, b) => parseDay(a.date).getTime() - parseDay(b.date).getTime());
-  let total = 0;
-  own.forEach((log, i) => {
-    total += scoreActivity(log, own.slice(0, i), table).total;
-  });
-  for (const e of events) if (e.groupId === groupId) total += organizationBonus(e);
-  return total;
+export const DAILY_STREAK_BONUS = 5; // per day, from 2 days
+export const DAILY_STREAK_CAP = 30;
+export const WEEKLY_STREAK_BONUS = 15; // per week, from 2 weeks
+export const WEEKLY_STREAK_CAP = 90;
+export const WEEKLY_DECAY = 10; // per idle week, during the first month
+export const MONTHLY_DECAY = 60; // per idle month after that
+export const MAX_LEAVES = 24;
+
+export function decayPoints(daysIdle: number): number {
+  if (daysIdle < 7) return 0;
+  if (daysIdle < 30) return WEEKLY_DECAY * Math.floor(daysIdle / 7);
+  return WEEKLY_DECAY * 4 + MONTHLY_DECAY * Math.floor(daysIdle / 30);
 }
 
-export interface LeaderboardRow {
-  group: Group;
-  score: number;
+export function groupHealth(logDates: string[], today = todayISO()): Health {
+  const days = new Set(logDates.filter((d) => d <= today));
+  if (!days.size)
+    return { dailyStreak: 0, weeklyStreak: 0, daysSinceLast: null, streakBonus: 0, decay: 0, leaves: 0, shrink: 1, status: "New" };
+
+  const sorted = [...days].sort();
+  const last = sorted[sorted.length - 1];
+  const daysSinceLast = daysBetween(last, today);
+
+  let dailyStreak = 0;
+  if (daysSinceLast <= 1) {
+    const cursor = parseD(last);
+    while (days.has(isoOf(cursor))) {
+      dailyStreak++;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+  }
+
+  let weeklyStreak = 0;
+  for (let w = 0; ; w++) {
+    const hit = sorted.some((d) => {
+      const ago = daysBetween(d, today);
+      return ago >= w * 7 && ago < (w + 1) * 7;
+    });
+    if (!hit) break;
+    weeklyStreak++;
+  }
+
+  const streakBonus =
+    (dailyStreak >= 2 ? Math.min(DAILY_STREAK_CAP, DAILY_STREAK_BONUS * dailyStreak) : 0) +
+    (weeklyStreak >= 2 ? Math.min(WEEKLY_STREAK_CAP, WEEKLY_STREAK_BONUS * weeklyStreak) : 0);
+  const decay = decayPoints(daysSinceLast);
+
+  // Leaves: 3 per streak week + 1 per streak day; each idle week strips 4.
+  const grown = Math.min(MAX_LEAVES, weeklyStreak * 3 + dailyStreak + (daysSinceLast < 7 ? 2 : 0));
+  const idleWeeks = Math.floor(daysSinceLast / 7);
+  const net = grown - idleWeeks * 4;
+  const leaves = Math.max(0, net);
+  const shrink = net >= 0 ? 1 : Math.max(0.6, 1 + net * 0.04);
+
+  const status: Health["status"] =
+    weeklyStreak >= 3 ? "Thriving" : daysSinceLast < 7 ? "Healthy" : daysSinceLast < 14 ? "Quiet" : daysSinceLast < 30 ? "Wilting" : "Dormant";
+
+  return { dailyStreak, weeklyStreak, daysSinceLast, streakBonus, decay, leaves, shrink, status };
+}
+
+const isoOf = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Group score: sum of members' log points in this group, plus streaks, minus decay (never below 0). */
+export function groupScore(group: Group, logs: ActivityLog[], today = todayISO()) {
+  const own = logs.filter((l) => l.groupId === group.id && group.memberIds.includes(l.authorId));
+  const base = own.reduce((a, l) => a + l.points.total, 0);
+  const health = groupHealth(own.map((l) => l.date), today);
+  return { base, health, total: Math.max(0, base + health.streakBonus - health.decay), outings: own.length };
+}
+
+/* ---------------- tree growth by lifetime ---------------- */
+
+export type Stage = "Acorn" | "Sprout" | "Sapling" | "Young tree" | "Full canopy";
+
+export function stageFor(ageDays: number): Stage {
+  if (ageDays < 7) return "Acorn";
+  if (ageDays < 30) return "Sprout";
+  if (ageDays < 90) return "Sapling";
+  if (ageDays < 180) return "Young tree";
+  return "Full canopy";
+}
+
+export const STAGE_SCALE: Record<Stage, number> = {
+  Acorn: 0.45,
+  Sprout: 0.62,
+  Sapling: 0.78,
+  "Young tree": 0.9,
+  "Full canopy": 1,
+};
+
+/** Days until the next stage, or null at full size. */
+export function nextStageIn(ageDays: number): { stage: Stage; days: number } | null {
+  const marks: [number, Stage][] = [
+    [7, "Sprout"],
+    [30, "Sapling"],
+    [90, "Young tree"],
+    [180, "Full canopy"],
+  ];
+  const next = marks.find(([d]) => d > ageDays);
+  return next ? { stage: next[1], days: next[0] - ageDays } : null;
+}
+
+/* ---------------- leaderboards ---------------- */
+
+export type BoardScope = "local" | "school" | "duos";
+
+export interface BoardRow extends Competitor {
+  id?: string;
+  mine: boolean;
   rank: number;
 }
 
-export function leaderboard(
+export const isDuo = (g: Group) => g.memberIds.length === 2;
+
+export function boardRows(
+  scope: BoardScope,
   groups: Group[],
   logs: ActivityLog[],
-  events: EventProposal[],
-  table: NichenessTable,
-  filter?: { location?: string; school?: string },
-): LeaderboardRow[] {
-  return groups
-    .filter((g) => !filter?.location || g.location === filter.location)
-    .filter((g) => !filter?.school || g.school === filter.school)
-    .map((group) => ({ group, score: groupScore(group.id, logs, events, table), rank: 0 }))
-    .sort((a, b) => b.score - a.score)
-    .map((row, i) => ({ ...row, rank: i + 1 }));
-}
-
-export type TreeStage = "acorn" | "sprout" | "sapling" | "tree";
-
-export const TREE_EMOJI: Record<TreeStage, string> = {
-  acorn: "🌰",
-  sprout: "🌱",
-  sapling: "🌿",
-  tree: "🌳",
-};
-
-export function groupAgeDays(group: Group, now: Date = new Date()): number {
-  return Math.max(0, Math.floor((now.getTime() - parseDay(group.createdAt).getTime()) / DAY_MS));
-}
-
-export function treeStage(ageDays: number): TreeStage {
-  if (ageDays >= 90) return "tree";
-  if (ageDays >= 30) return "sapling";
-  if (ageDays >= 7) return "sprout";
-  return "acorn";
-}
-
-/** Fruit appears once the group is 30+ days old: one emoji per logged activity (most recent first). */
-export function treeFruit(group: Group, logs: ActivityLog[], now: Date = new Date(), max = 12): string[] {
-  if (groupAgeDays(group, now) < 30) return [];
-  return logs
-    .filter((l) => l.groupId === group.id)
-    .sort((a, b) => parseDay(b.date).getTime() - parseDay(a.date).getTime())
-    .slice(0, max)
-    .map((l) => l.emoji);
+  competitors: Competitor[],
+  filter: { region?: string; school?: string; mineIds?: string[] },
+  today = todayISO(),
+): BoardRow[] {
+  const eligible = groups.filter((g) => {
+    if (scope === "duos") return isDuo(g);
+    if (isDuo(g)) return false;
+    if (scope === "school") return !!filter.school && g.school === filter.school;
+    return !filter.region || g.region === filter.region;
+  });
+  const ours = eligible.map((g) => {
+    const s = groupScore(g, logs, today);
+    return {
+      id: g.id,
+      name: g.name,
+      size: g.memberIds.length,
+      hood: scope === "school" ? (g.school ?? "") : g.hood,
+      outings: s.outings,
+      pts: s.total,
+      mine: !!filter.mineIds?.includes(g.id),
+      rank: 0,
+    };
+  });
+  return [...competitors.map((c) => ({ ...c, mine: false, rank: 0 })), ...ours]
+    .sort((a, b) => b.pts - a.pts)
+    .map((r, i) => ({ ...r, rank: i + 1 }));
 }

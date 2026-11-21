@@ -1,39 +1,40 @@
 # Scoring rules
 
-Implemented in `web/src/lib/scoring.ts` (tested in `scoring.test.ts`). Numbers are starting values to tune.
+Implemented in `web/src/lib/scoring.ts` (tests in `scoring.test.ts`). Numbers are starting values to tune.
 
-## Points per logged activity
+## Points per log
 
-```
-points = BASE (10)
-       + nicheness bonus   round(nicheness × 40), nicheness ∈ [0, 1]
-       + first-time bonus  +15 if this group has never logged this category
-       + holiday bonus     ×1.5 on special days (Christmas season, Thanksgiving, July 4, Halloween, NYE, Valentine's)
-```
+Factors, largest share of points first:
 
-## Confirming events quickly
+| # | Factor | Max | How it works |
+|---|---|---|---|
+| 1 | Nicheness | +100 | `100 × nicheness`, using the rarer of the category and any label (e.g. `#pottery` = 0.8, coffee = 0.05). Label scores will come from the data pipeline. |
+| 2 | Group turnout | +60 | `60 × (attendees / members)²`. Nonlinear, so 2 of 8 people earn 4, not 15. |
+| 3 | Finalization speed | +40 | Only for logs linked to a plan: `40 × (1 − hours from posted to locked in / 72)`. |
+| 4 | Krillion bonus | +30 | Nobody in the whole app has logged this activity yet this calendar month. The activity is the log's first label, else its category. |
+| 5 | Holiday bonus | +20 | Christmas week, New Year, Thanksgiving, Halloween, July 4, Valentine's Day, St. Patrick's Day. |
 
-When an event proposal is confirmed, the group gets an organization bonus:
-- confirmed within 24 h of proposal: **+20**
-- within 72 h: **+10**
-- later: **+0**
+Points are computed when the log is saved and stored on it (Krillion depends on what existed at that moment).
 
-## Nicheness
+## Group score
 
-Produced by the pipeline per category: `1 − normalized log(popularity)`. Very common categories (coffee, pizza) get near 0, rare ones (axe throwing, a one-off street festival) get near 1. Unknown categories default to 0.5.
+`sum of points of logs posted by the group's members` + streak bonus − decay, never below 0.
 
-## Group score & leaderboard
+### Streaks
+- **Daily streak**: consecutive days with a log, ending today or yesterday. From 2 days: +5/day, max +30.
+- **Weekly streak**: consecutive 7-day windows with a log, ending today. From 2 weeks: +15/week, max +90.
 
-Group score = sum of all its activity points + organization bonuses. Leaderboards filter groups by city or school.
+### Decay (long inactivity)
+- First month idle: −10 per full idle week.
+- After that: −40, then −60 per full idle month.
 
-## Tree growth
+## Tree
+- **Size** grows with group lifetime: Acorn (<7 days, no logs) → Sprout (7) → Sapling (30) → Young tree (90) → Full canopy (180).
+- **Branches + fruit**: one per log; fruit is the log's emoji.
+- **Leaves** (health): 3 per streak week + 1 per streak day (+2 if active this week), max 24. Each idle week removes 4 leaves. Once the leaves are gone, further decay shrinks the tree (down to 60%).
+- **Status**: Thriving (3+ week streak), Healthy (<7 days idle), Quiet (<14), Wilting (<30), Dormant.
 
-Based on group age (days since `createdAt`):
-
-| Stage | Age |
-|---|---|
-| 🌰 acorn | 0–6 days |
-| 🌱 sprout | 7–29 |
-| 🌿 sapling | 30–89 |
-| 🌳 tree | 90+ |
-| fruit | from 30 days, each logged activity's emoji hangs on the tree |
+## Leaderboards
+- **Local**: groups of 3–8 in your region.
+- **My school**: groups tagged with your verified university.
+- **Duos**: groups of exactly 2 compete only with each other.

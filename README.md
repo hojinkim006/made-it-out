@@ -1,29 +1,26 @@
-# 🌳 Make It Out
+# 🌳 make it out.
 
 Make scheduling hangouts with friends faster and more fun. Groups post events, members vote on times, and every hangout you log grows your group's tree. Doing new, niche activities (and organizing quickly) earns points on a local leaderboard.
 
-## Core ideas
+## Features
 
-| Concept | What it means here |
-|---|---|
-| **Log it** (inspired by Beli) | Log an activity with place, date and who came. |
-| **Nicheness** (inspired by Krillion) | Rarer activities score more, based on Yelp + Boston event data. |
-| **Group tree** | Each group starts as an 🌰 acorn and grows with group lifetime; past events grow on it as emoji fruit. |
-| **No chat, only events** | Members propose an event (e.g. "dinner @ ___ @ 5pm") and vote on time/date changes. One place for plans. |
-| **Leaderboard** | Sum of group log points; filter locally (Boston, per school). |
+- **Accounts**: sign up with email, username, password, display name, phone and region. Log in with email, username or phone. Optional university verification for school boards.
+- **Friends**: add by unique username; search your friends when creating a group.
+- **Groups** (3–8 people; pairs go on a separate Duos board): a tree that grows from an acorn over the group's lifetime, with emoji fruit for past events and green leaves for streaks (decay strips them).
+- **Events, not chat**: any member posts a plan; others accept or suggest and vote on a new time (Votes sub-tab, linked to "Next up").
+- **Logs** (like Beli): place, date, who came, description, photos/videos, and manual labels.
+- **Scoring**: nicheness > group turnout > finalization speed > Krillion bonus > holiday bonus, plus streaks and decay. See [docs/SCORING.md](docs/SCORING.md).
+- **Leaderboards**: local (by region), my school, duos.
 
-## App layout
-
-- **Profile** (home screen): your groups, quick personal stats
-- **Group**: tree, name, location, members, events, log history
-- **Leaderboard**: group rankings by area
+Planned: Gemini auto-labels for log titles; dataset-driven nicheness and Krillion detection.
 
 ## Repo layout
 
 ```
 web/          React + TypeScript + Vite web app
-  src/lib/    pure domain logic (scoring, tree growth), unit tested
-  src/pages/  Profile, Group, Leaderboard tabs
+  src/lib/    pure logic: scoring, streaks/decay, plans/votes, auth (unit tested)
+  src/pages/  Auth, Profile, Group (+ Votes), Plan, Log, Leaderboard
+  src/store.tsx  demo data store, synced live across browser windows
 pipeline/     Python scripts: raw datasets -> nicheness scores
 data/raw/     downloaded datasets (git-ignored)
 data/processed/ generated output (git-ignored, except samples)
@@ -44,4 +41,4 @@ cd pipeline && python3 -m pip install -e ".[dev]" && python3 -m make_it_out_pipe
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commits and the PR flow. Docs: [Architecture](docs/ARCHITECTURE.md) · [Scoring](docs/SCORING.md) · [Data](docs/DATA.md).
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, commits and the PR flow. Demo: [docs/DEMO.md](docs/DEMO.md) · Docs: [Architecture](docs/ARCHITECTURE.md) · [Scoring](docs/SCORING.md) · [Data](docs/DATA.md).
