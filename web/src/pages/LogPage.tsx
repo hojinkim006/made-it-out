@@ -7,6 +7,9 @@ import { nichePercentile, spotById, usePlaceData, type Spot } from "../lib/place
 import { MAX_FRUIT } from "../components/Tree";
 import { CATS, normLabel, scoreLog } from "../lib/scoring";
 import { todayISO } from "../lib/dates";
+import { estCost, fmtRange, rateLog } from "../lib/budget";
+import { eventWhen } from "../lib/plans";
+import { Stars } from "../components/Stars";
 import { groupInfo } from "../lib/groupInfo";
 import type { ActivityLog, Cat, Media } from "../lib/types";
 
@@ -43,18 +46,21 @@ export function LogPage() {
   const { route, go } = useNav();
   const [gid, setGid] = useState(route.groupId ?? myGroups[0]?.id);
   const g = myGroups.find((x) => x.id === gid) ?? myGroups[0];
-  const [title, setTitle] = useState(g?.plan?.confirmedAt ? g.plan.title : "");
-  const [where, setWhere] = useState(g?.plan?.confirmedAt ? g.plan.where : "");
-  const [date, setDate] = useState(todayISO());
-  const [who, setWho] = useState<string[]>(g ? (g.plan?.confirmedAt ? g.plan.inIds : g.memberIds) : []);
+  const seededWhen = g?.plan?.confirmedOptionId ? eventWhen(g.plan) : null;
+  const [title, setTitle] = useState(g?.plan?.confirmedOptionId ? g.plan.title : "");
+  const [where, setWhere] = useState(g?.plan?.confirmedOptionId ? g.plan.where : "");
+  const [date, setDate] = useState(seededWhen?.date ?? todayISO());
+  const [who, setWho] = useState<string[]>(g ? (g.plan?.confirmedOptionId ? g.plan.goingIds : g.memberIds) : []);
   const [cat, setCat] = useState<Cat>("food");
   const [emoji, setEmoji] = useState(CATS.food.emoji);
   const [labels, setLabels] = useState<string[]>([]);
   const [labelDraft, setLabelDraft] = useState("");
   const [desc, setDesc] = useState("");
+  const [price, setPrice] = useState(g?.plan?.confirmedOptionId && g.plan.price != null ? String(g.plan.price) : "");
+  const [myRate, setMyRate] = useState(0);
   const [media, setMedia] = useState<Media[]>([]);
-  const [linkPlan, setLinkPlan] = useState(!!g?.plan?.confirmedAt);
-  const [placeId, setPlaceId] = useState<string | undefined>(g?.plan?.confirmedAt ? g.plan.placeId : undefined);
+  const [linkPlan, setLinkPlan] = useState(!!g?.plan?.confirmedOptionId);
+  const [placeId, setPlaceId] = useState<string | undefined>(g?.plan?.confirmedOptionId ? g.plan.placeId : undefined);
   const data = usePlaceData();
   const spot = data ? spotById(data, placeId) : null;
   const [bad, setBad] = useState(false);
@@ -95,8 +101,10 @@ export function LogPage() {
   const switchGroup = (id: string) => {
     const ng = myGroups.find((x) => x.id === id)!;
     setGid(id);
-    setWho(ng.memberIds);
-    setLinkPlan(!!ng.plan?.confirmedAt);
+    setWho(ng.plan?.confirmedOptionId && ng.plan.goingIds.length ? ng.plan.goingIds : ng.memberIds);
+    setLinkPlan(!!ng.plan?.confirmedOptionId);
+    const when = ng.plan ? eventWhen(ng.plan) : null;
+    if (when) setDate(when.date);
   };
 
   const pick = (s: Spot) => {
@@ -131,6 +139,9 @@ export function LogPage() {
   const save = () => {
     if (!title.trim()) return setBad(true);
     if (!who.length) return toast("Pick at least one person who made it out");
+    const typed = price.trim() === "" ? null : Math.round(Number(price));
+    if (typed !== null && (Number.isNaN(typed) || typed < 0)) return toast("Cost has to be zero or more");
+    const attendees = g.memberIds.filter((m) => who.includes(m));
     const log: ActivityLog = {
       id: uid(),
       groupId: g.id,
@@ -142,16 +153,21 @@ export function LogPage() {
       labels,
       date: date || todayISO(),
       where: where.trim(),
-      attendeeIds: g.memberIds.filter((m) => who.includes(m)),
+      attendeeIds: attendees,
       media,
       eventId: plan?.id,
       placeId: spot?.id,
+      price: typed,
+      est: estCost(title.trim(), where.trim(), cat),
+      ratings: {},
+      comments: [],
       points: pts,
     };
     const ok = update((s) => {
       s.logs.push(log);
+      if (myRate && attendees.includes(me!.id)) rateLog(s, log.id, me!.id, myRate);
       const gg = s.groups.find((x) => x.id === g.id)!;
-      if (plan && gg.plan?.id === plan.id) {
+      if (plan && gg.plan && gg.plan.id === plan.id) {
         gg.pastPlans.push(gg.plan);
         gg.plan = null;
       }
@@ -195,12 +211,15 @@ export function LogPage() {
                   if (e.target.checked) {
                     setTitle(g.plan!.title);
                     setWhere(g.plan!.where);
-                    setWho(g.plan!.inIds.length ? g.plan!.inIds : g.memberIds);
+                    setWho(g.plan!.confirmedOptionId && g.plan!.goingIds.length ? g.plan!.goingIds : g.memberIds);
                     setPlaceId(g.plan!.placeId);
+                    setPrice(g.plan!.price != null ? String(g.plan!.price) : "");
+                    const when = eventWhen(g.plan!);
+                    if (when) setDate(when.date);
                   }
                 }}
               />
-              This is our plan: <b>{g.plan.title}</b> {g.plan.confirmedAt ? "(locked in, earns speed points)" : "(not locked in yet)"}
+              This is our plan: <b>{g.plan.title}</b> {g.plan.confirmedOptionId ? "(confirmed, earns speed points)" : "(not confirmed yet)"}
             </label>
           )}
           <label className="f">
@@ -253,6 +272,16 @@ export function LogPage() {
               </select>
             </label>
           </div>
+          <label className="f">
+            <span>
+              What it cost per person <em>optional</em>
+            </span>
+            <div className="money-in">
+              <span>$</span>
+              <input className="field" type="number" min={0} step={1} inputMode="decimal" placeholder="Leave blank to use the estimate" value={price} onChange={(e) => setPrice(e.target.value)} />
+            </div>
+            <small className="hint">{estCost(title, where, cat) ? `Gemini estimate (simulated): ${fmtRange(estCost(title, where, cat))} per person` : "Add a place and we can estimate the cost."}</small>
+          </label>
           <div className="f">
             <span>
               Who made it out? <em>{who.length} of {g.memberIds.length}</em>
@@ -269,6 +298,12 @@ export function LogPage() {
                 );
               })}
             </div>
+          </div>
+          <div className="f">
+            <span>
+              How was it? <em>your rating · everyone who went can rate later</em>
+            </span>
+            <Stars value={myRate} onRate={setMyRate} />
           </div>
           <div className="f">
             <span>Pick a memory for your tree</span>

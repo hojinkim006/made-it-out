@@ -23,6 +23,7 @@ const group = (over: Partial<Group> = {}): Group => ({
   memberIds: ["a", "b", "c", "d"],
   plan: null,
   pastPlans: [],
+  feed: [],
   ...over,
 });
 
@@ -39,6 +40,10 @@ const log = (over: Partial<ActivityLog> = {}): ActivityLog => ({
   where: "",
   attendeeIds: ["a"],
   media: [],
+  price: null,
+  est: null,
+  ratings: {},
+  comments: [],
   points: { niche: 0, turnout: 0, speed: 0, krillion: 0, holiday: 0, holidayName: null, total: 10 },
   ...over,
 });

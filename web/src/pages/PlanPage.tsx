@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useStore, uid } from "../store";
 import { useNav } from "../nav";
 import { Icon } from "../components/Icons";
-import { fmtD, fmtT, nextFriday, todayISO } from "../lib/dates";
+import { fmtD, fmtT, nextFriday, parseD, iso, todayISO } from "../lib/dates";
 import { postPlan } from "../lib/plans";
+import { estCost, fmtRange } from "../lib/budget";
 import { PlaceSearch } from "../components/PlaceSearch";
 import { TryNext } from "../components/TryNext";
 import { spotById, usePlaceData, type Spot } from "../lib/places";
@@ -20,7 +21,16 @@ export function PlanPage() {
   const data = usePlaceData();
   const spot = data ? spotById(data, placeId) : null;
   const [time, setTime] = useState("18:30");
+  const [alt, setAlt] = useState(false);
+  const [date2, setDate2] = useState(() => {
+    const d = parseD(pre?.date && pre.date >= todayISO() ? pre.date : nextFriday());
+    d.setDate(d.getDate() + 1);
+    return iso(d);
+  });
+  const [time2, setTime2] = useState("18:30");
+  const [auto, setAuto] = useState(false);
   const [note, setNote] = useState("");
+  const [price, setPrice] = useState("");
   const [bad, setBad] = useState<string | null>(null);
   const g = myGroups.find((x) => x.id === gid) ?? myGroups[0];
   if (!g) return <p className="muted">Create a group first.</p>;
@@ -35,7 +45,11 @@ export function PlanPage() {
   const share = () => {
     if (!title.trim()) return setBad("title");
     if (!date) return setBad("date");
-    update((s) => postPlan(s, g.id, { id: uid(), title: title.trim(), where: where.trim() || "Location TBD", date, time: time || "18:00", note: note.trim(), placeId, byId: me!.id }));
+    const typed = price.trim() === "" ? null : Math.round(Number(price));
+    if (typed !== null && (Number.isNaN(typed) || typed < 0)) return setBad("price");
+    const options = [{ id: uid(), date, time: time || "18:00" }];
+    if (alt && date2 && !(date2 === date && (time2 || "18:00") === (time || "18:00"))) options.push({ id: uid(), date: date2, time: time2 || "18:00" });
+    update((s) => postPlan(s, g.id, { id: uid(), title: title.trim(), where: where.trim() || "Location TBD", note: note.trim(), placeId, byId: me!.id, auto, price: typed, options }));
     go("group", { groupId: g.id, tab: "votes" });
     toast(`Shared with ${g.name}. Everyone sees it now.`);
   };
@@ -48,7 +62,7 @@ export function PlanPage() {
       <div className="page-head">
         <div>
           <h1>Get something on the calendar.</h1>
-          <p className="sub">A good idea is all it takes. Your friends can accept or vote on a new time.</p>
+          <p className="sub">Post the plan once. Friends answer each time, and the host locks in the winner.</p>
         </div>
       </div>
       <div className="grid-side">
@@ -72,6 +86,16 @@ export function PlanPage() {
               placeholder="Search Boston places, or type anything"
             />
           </div>
+          <label className="f">
+            <span>
+              Cost per person <em>optional</em>
+            </span>
+            <div className="money-in">
+              <span>$</span>
+              <input className={`field${bad === "price" ? " err" : ""}`} type="number" min={0} step={1} inputMode="decimal" placeholder="Leave blank to use the estimate" value={price} onChange={(e) => (setPrice(e.target.value), setBad(null))} />
+            </div>
+            <small className="hint">{estCost(title, where) ? `Gemini estimate (simulated): ${fmtRange(estCost(title, where))} per person` : "Add a place and we can estimate the cost."}</small>
+          </label>
           <div className="f2">
             <label className="f">
               <span>Date</span>
@@ -82,6 +106,22 @@ export function PlanPage() {
               <input type="time" className="field" value={time} onChange={(e) => setTime(e.target.value)} />
             </label>
           </div>
+          {alt ? (
+            <div className="f2">
+              <label className="f">
+                <span>Second date</span>
+                <input type="date" className="field" value={date2} onChange={(e) => setDate2(e.target.value)} />
+              </label>
+              <label className="f">
+                <span>Second time</span>
+                <input type="time" className="field" value={time2} onChange={(e) => setTime2(e.target.value)} />
+              </label>
+            </div>
+          ) : (
+            <button className="link" type="button" onClick={() => setAlt(true)} style={{ margin: "-6px 0 18px" }}>
+              <Icon name="plus" /> Offer a second time
+            </button>
+          )}
           <label className="f">
             <span>
               A little context <em>optional</em>
@@ -97,6 +137,10 @@ export function PlanPage() {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="check-row" style={{ margin: 0 }}>
+            <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} />
+            <span>Auto-confirm the recommended time when voting closes</span>
           </label>
         </section>
         <aside className="stack">
@@ -118,15 +162,15 @@ export function PlanPage() {
               <li>
                 <b>02</b>
                 <div>
-                  <strong>Find your time</strong>
-                  <span>Friends accept, or suggest and vote on a new time.</span>
+                  <strong>Answer every time</strong>
+                  <span>Yes, partly, if needed, or no. The host has to be free.</span>
                 </div>
               </li>
               <li>
                 <b>03</b>
                 <div>
-                  <strong>Lock it in fast</strong>
-                  <span>The quicker it's confirmed, the more points it earns.</span>
+                  <strong>Confirm the winner</strong>
+                  <span>The host locks it in, or it confirms itself when voting closes. Faster still earns more points.</span>
                 </div>
               </li>
             </ol>
@@ -134,7 +178,7 @@ export function PlanPage() {
           <section className="card pad">
             <h3>Ready for the group?</h3>
             <p className="muted small" style={{ marginTop: 4 }}>
-              This sends a proposal, not a final RSVP.
+              You're the host, so your Yes goes in automatically. Voting closes in 24 hours, or 2 hours before the earliest time if that's sooner.
             </p>
             <div className="preview">
               <div>
@@ -142,10 +186,22 @@ export function PlanPage() {
                 <span>{title || "—"}</span>
               </div>
               <div>
-                <span>When</span>
+                <span>Time option 1</span>
                 <span>
                   {date ? fmtD(date, { weekday: "short", month: "short", day: "numeric" }) : "—"} · {fmtT(time)}
                 </span>
+              </div>
+              {alt && (
+                <div>
+                  <span>Time option 2</span>
+                  <span>
+                    {date2 ? fmtD(date2, { weekday: "short", month: "short", day: "numeric" }) : "—"} · {fmtT(time2)}
+                  </span>
+                </div>
+              )}
+              <div>
+                <span>Cost per person</span>
+                <span>{price.trim() !== "" ? (Number(price) ? `$${Math.round(Number(price))}` : "Free") : estCost(title, where) ? `~${fmtRange(estCost(title, where))} (est.)` : "—"}</span>
               </div>
               <div>
                 <span>Sending to</span>

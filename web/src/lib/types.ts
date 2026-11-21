@@ -31,6 +31,19 @@ export interface PointBreakdown {
   total: number;
 }
 
+/** Per-person cost range. A stand-in for a Gemini estimate when nobody typed a price. */
+export interface CostRange {
+  lo: number;
+  hi: number;
+}
+
+export interface Comment {
+  id: ID;
+  byId: ID;
+  t: number; // epoch ms
+  text: string;
+}
+
 export interface ActivityLog {
   id: ID;
   groupId: ID;
@@ -46,15 +59,74 @@ export interface ActivityLog {
   media: Media[];
   eventId?: ID; // set when logged from a planned event
   placeId?: string; // OSM place ("node/123") or Boston event ("event/PUB1") from web/public/data
+  /** What someone typed, per person. Null means use the estimate. */
+  price: number | null;
+  est: CostRange | null;
+  /** Star ratings from people who went, 1–5. */
+  ratings: Record<ID, number>;
+  comments: Comment[];
   points: PointBreakdown;
 }
 
-export interface Suggestion {
+/** Per-time answer. Yes and Partly count as free; If needed and No do not. */
+export type AnswerKind = "yes" | "part" | "maybe" | "no";
+
+export interface TimeAnswer {
+  a: AnswerKind;
+  /** Earliest the person can arrive, for a Partly answer. HH:MM. */
+  from?: string;
+  /** When they have to leave, for a Partly answer. HH:MM. */
+  until?: string;
+}
+
+/** One candidate time on a plan. Everyone answers this time on its own. */
+export interface TimeOption {
+  id: ID;
+  byId: ID;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  resp: Record<ID, TimeAnswer>;
+}
+
+/** A non-host asking to add a time after the event is already confirmed. */
+export interface ChangeRequest {
   id: ID;
   byId: ID;
   date: string;
   time: string;
-  voterIds: ID[];
+}
+
+export type FeedKind =
+  | "post"
+  | "resp"
+  | "nonall"
+  | "suggest"
+  | "confirm"
+  | "autoconf"
+  | "reopen"
+  | "request"
+  | "reqyes"
+  | "reqno"
+  | "join"
+  | "drop"
+  | "handoff"
+  | "cancel"
+  | "extend"
+  | "comment"
+  | "rate";
+
+export interface FeedItem {
+  id: ID;
+  t: number; // epoch ms
+  byId: ID;
+  k: FeedKind;
+  title?: string;
+  opt?: string;
+  ans?: string;
+  why?: string;
+  to?: string;
+  text?: string;
+  n?: number;
 }
 
 export interface Plan {
@@ -62,16 +134,23 @@ export interface Plan {
   groupId: ID;
   title: string;
   where: string;
-  date: string;
-  time: string; // HH:MM
   note: string;
   placeId?: string;
-  byId: ID;
-  createdAt: string; // ISO datetime posted
-  confirmedAt?: string; // ISO datetime locked in
-  inIds: ID[]; // accepted current time
-  outIds: ID[]; // can't make it
-  suggestions: Suggestion[];
+  price: number | null;
+  est: CostRange | null;
+  byId: ID; // who posted it
+  hostId: ID; // who must be free, and who confirms
+  createdAt: string; // ISO datetime posted; reset when voting reopens
+  extMs: number; // extra voting time, added 12h at a time
+  auto: boolean; // confirm the recommended time when voting closes
+  pickId: string | null; // host's tie-break
+  confirmedOptionId: string | null;
+  /** Confirmed start. Later than the option time when people are only partly free. */
+  start: string | null;
+  goingIds: ID[];
+  requests: ChangeRequest[];
+  options: TimeOption[];
+  confirmedAt?: string; // ISO datetime locked in, used for finalization-speed points
 }
 
 export interface Group {
@@ -85,6 +164,8 @@ export interface Group {
   plan: Plan | null;
   /** Finished plans, kept so logs can reference their finalization speed. */
   pastPlans: Plan[];
+  /** Plan updates everyone in the group sees, including across open windows. */
+  feed: FeedItem[];
 }
 
 export interface State {

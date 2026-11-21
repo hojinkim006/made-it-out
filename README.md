@@ -7,7 +7,7 @@ Make scheduling hangouts with friends faster and more fun. Groups post events, m
 - **Accounts**: sign up with email, username, password, display name, phone and region. Log in with email, username or phone. Optional university verification for school boards.
 - **Friends**: add by unique username; search your friends when creating a group.
 - **Groups** (3–8 people; pairs go on a separate Duos board): a tree that grows from an acorn over the group's lifetime, with emoji fruit for past events and green leaves for streaks (decay strips them).
-- **Events, not chat**: any member posts a plan; others accept or suggest and vote on a new time (Votes sub-tab, linked to "Next up").
+- **Events, not chat**: any member posts a plan with one or more times. Everyone answers each time (yes, partly, if needed, or no). A time can be confirmed only when the host is free and enough of the group can come. The host confirms it, or it confirms itself when voting closes.
 - **Logs** (like Beli): place, date, who came, description, photos/videos, and manual labels.
 - **Scoring**: nicheness > group turnout > finalization speed > Krillion bonus > holiday bonus, plus streaks and decay. See [docs/SCORING.md](docs/SCORING.md).
 - **Leaderboards**: local (by region), my school, duos.

@@ -1,10 +1,13 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStore, uid } from "../store";
 import { useNav } from "../nav";
 import { Sheet } from "./Sheet";
 import { Avatar, Icon } from "./Icons";
+import { Stars } from "./Stars";
 import { CATS, MAX_GROUP, MIN_GROUP } from "../lib/scoring";
 import { fmtD } from "../lib/dates";
+import { addComment, avgRating, costOf, rateLog } from "../lib/budget";
+import { relTime } from "../lib/plans";
 import type { ActivityLog } from "../lib/types";
 
 /** Create a group by searching your friends list. */
@@ -40,6 +43,7 @@ export function NewGroupSheet({ onClose }: { onClose: () => void }) {
         memberIds: [me!.id, ...picked],
         plan: null,
         pastPlans: [],
+        feed: [],
       });
     });
     onClose();
@@ -145,11 +149,29 @@ export function InviteSheet({ groupId, onClose }: { groupId: string; onClose: ()
 
 /** Full view of one logged activity. */
 export function LogSheet({ logs, index, onClose, onNav }: { logs: ActivityLog[]; index: number; onClose: () => void; onNav: (i: number) => void }) {
-  const { state, nameOf, me } = useStore();
+  const { state, nameOf, me, update, toast } = useStore();
+  const [draft, setDraft] = useState("");
   const l = logs[index];
+  useEffect(() => setDraft(""), [index]);
   if (!l) return null;
   const g = state.groups.find((x) => x.id === l.groupId);
   const p = l.points;
+  const went = !!me && l.attendeeIds.includes(me.id);
+  const mine = me ? l.ratings[me.id] : undefined;
+  const avg = avgRating(l.ratings);
+  const cost = costOf(l);
+  const rate = (n: number) => {
+    if (!me) return;
+    update((s) => rateLog(s, l.id, me.id, n));
+    toast(`Rated ${n}★`);
+  };
+  const post = () => {
+    const text = draft.trim();
+    if (!text || !me) return;
+    update((s) => addComment(s, l.id, me.id, text, uid()));
+    setDraft("");
+    toast("Comment posted");
+  };
   return (
     <Sheet onClose={onClose}>
       <div className="sheet-hero">
@@ -172,6 +194,26 @@ export function LogSheet({ logs, index, onClose, onNav }: { logs: ActivityLog[];
         )}
       </div>
       {l.description && <div className="quote">“{l.description}”</div>}
+      <div className="rate-row">
+        <div>
+          <div className="eyebrow" style={{ margin: "0 0 6px" }}>
+            Group rating
+          </div>
+          <div className="big-rate">
+            {avg != null ? avg.toFixed(1) : "–"}
+            <span>★</span>
+          </div>
+          <p className="muted small" style={{ marginTop: 4 }}>
+            {Object.keys(l.ratings).length} of {l.attendeeIds.length} who went rated it
+          </p>
+        </div>
+        <div className="my-rate">
+          <div className="eyebrow" style={{ margin: "0 0 6px" }}>
+            {went ? (mine ? "Your rating" : "Rate it") : "Only people who went can rate"}
+          </div>
+          <Stars value={mine ?? 0} onRate={went ? rate : undefined} readOnly={!went} />
+        </div>
+      </div>
       {l.media.length > 0 && (
         <div className="sheet-media">
           {l.media.map((m) => (m.kind === "image" ? <img key={m.id} src={m.url} alt="" /> : <video key={m.id} src={m.url} controls />))}
@@ -194,6 +236,15 @@ export function LogSheet({ logs, index, onClose, onNav }: { logs: ActivityLog[];
           <span />
           <span className="names muted">{l.attendeeIds.map(nameOf).join(", ")}</span>
         </div>
+        {cost && (
+          <div>
+            <span>Cost per person</span>
+            <span className="names">
+              {cost.txt}
+              {cost.manual ? "" : <span className="muted"> (estimate)</span>}
+            </span>
+          </div>
+        )}
         <div>
           <span>Logged by</span>
           <span className="names">{nameOf(l.authorId)}</span>
@@ -214,6 +265,30 @@ export function LogSheet({ logs, index, onClose, onNav }: { logs: ActivityLog[];
           <span>Group</span>
           <span className="names">{g?.name}</span>
         </div>
+      </div>
+      <div className="mini-h">Comments ({l.comments.length})</div>
+      <div className="comments">
+        {l.comments.length ? (
+          l.comments.map((c) => (
+            <div className="fitem" key={c.id}>
+              <Avatar name={nameOf(c.byId)} me={c.byId === me?.id} />
+              <div>
+                <p>
+                  <b>{nameOf(c.byId)}</b> {c.text}
+                </p>
+                <span className="muted small">{relTime(c.t)}</span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="muted small">No comments yet. Start the thread.</p>
+        )}
+      </div>
+      <div className="cm-row">
+        <input className="field" placeholder="Add a comment" maxLength={200} value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === "Enter" && post()} />
+        <button className="btn btn-primary" onClick={post}>
+          Post
+        </button>
       </div>
       <div className="sheet-nav">
         <button className="btn btn-secondary sm" disabled={index === 0} onClick={() => onNav(index - 1)}>

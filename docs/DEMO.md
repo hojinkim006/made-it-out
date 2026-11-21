@@ -21,15 +21,16 @@ All app data lives in the browser's `localStorage`. Every window of the app on t
 Passwords are in the project overview doc; the repo only stores hashes. Log in with email, username or phone.
 
 ## Seed groups
-- **The Side Questers** (Hojin, David, Andrew, Matt): 13 logs, 5-week streak, thriving. Use this for the 4-screen demo.
-- **Study Breakers** (David, John, Andrew): last log 20 days ago, so it's wilting. Has an open plan with a suggested time (shows the Votes tab).
+- **The Side Questers** (Hojin, David, Andrew, Matt): 13 logs, thriving, and an open Friendsgiving plan. Andrew is the host. Friday already has enough people (Andrew yes, Matt yes, David partly after 6:30). Saturday is David's other time. Hojin hasn't answered. Use this for the 4-screen demo.
+- **Study Breakers** (David, John, Andrew): last log 20 days ago, so it's wilting.
 - **Night Owls** (Hojin, Matt): a duo, so it's on the Duos board.
 
 ## 4-screen script
 Open 4 browser windows at http://localhost:5173 (side by side) and log in as Hojin, David, Andrew, Matt.
 
-1. **User 1 (David)**: Your groups → The Side Questers → Plan a hangout → "Dinner @ ___ @ 5pm" → Share. The other three get a notification and see it under **Votes**.
-2. **User 2 (Andrew)**: Votes → **Accept**.
-3. **User 3 (Matt)**: does nothing, shown as "Hasn't answered".
-4. **User 4 (Hojin)**: **Suggest a time** → pick a new time → Send. Everyone sees the new option and can vote.
-5. Back to David: **Use this time** or **Lock it in**, then **Log this hangout** to show points (speed bonus), the new fruit, and the leaderboard move.
+1. **Everyone**: Your groups → The Side Questers → **Votes**. Friday is recommended: the host is free and 3 of 4 can come. David's "Partly" offers to start at 6:30 so the times overlap.
+2. **Hojin**: answer **Yes** on Friday (or **Partly** and set a window).
+3. **Andrew (host)**: **Confirm…**, keep the later start so David overlaps, and confirm. A time the host can't make, or that fewer than 3 people can attend, stays unconfirmed.
+4. **David**: **Log it** to show points (speed bonus from how fast it was confirmed), the new fruit, and the leaderboard move.
+
+Posting a new event replaces this plan. The host's Yes is recorded on each time they offer. Voting closes after 24 hours, or 2 hours before the earliest time. Turn on auto-confirm and the recommended time locks itself in at that deadline.

@@ -3,8 +3,10 @@
 import type { ActivityLog, Cat, Competitor, Group, Plan, State, User } from "../lib/types";
 import { CATS, scoreLog } from "../lib/scoring";
 import { daysAgo, nextFriday, parseD, iso } from "../lib/dates";
+import { estCost } from "../lib/budget";
+import { optLabel } from "../lib/plans";
 
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 4;
 
 const users: User[] = [
   {
@@ -105,22 +107,67 @@ function pastPlan(id: string, groupId: string, byId: string, logDaysAgo: number,
   const created = parseD(daysAgo(logDaysAgo + 4));
   created.setHours(10);
   const confirmed = new Date(created.getTime() + hoursToConfirm * 36e5);
+  const date = daysAgo(logDaysAgo);
   return {
     id,
     groupId,
     title: "",
     where: "",
-    date: daysAgo(logDaysAgo),
-    time: "18:00",
     note: "",
+    price: null,
+    est: null,
     byId,
+    hostId: byId,
     createdAt: created.toISOString(),
     confirmedAt: confirmed.toISOString(),
-    inIds: [],
-    outIds: [],
-    suggestions: [],
+    extMs: 0,
+    auto: false,
+    pickId: null,
+    confirmedOptionId: `${id}-o`,
+    start: "18:00",
+    goingIds: [],
+    requests: [],
+    options: [{ id: `${id}-o`, byId, date, time: "18:00", resp: {} }],
   };
 }
+
+/** Typed prices and ratings from the v3 prototype, matched onto the current outings. */
+const EXTRAS: Record<string, { price?: number; ratings?: Record<string, number>; comments?: { by: string; hoursAgo: number; text: string }[] }> = {
+  "Late-night ramen run": {
+    price: 22,
+    ratings: { hojin: 5, david: 4, andrew: 4, matt: 5 },
+    comments: [{ by: "hojin", hoursAgo: 118 * 24 - 3, text: "Worth the line. Every time." }],
+  },
+  "Board game café night": { price: 10, ratings: { david: 4, andrew: 5, matt: 4 } },
+  "Late night at the MFA": { ratings: { hojin: 5, david: 4, andrew: 4, matt: 5 } },
+  "Jazz at Wally's": {
+    price: 15,
+    ratings: { hojin: 5, david: 5, andrew: 5 },
+    comments: [{ by: "andrew", hoursAgo: 70 * 24 - 4, text: "We need to go back for the Sunday jam." }],
+  },
+  "Blue Hills sunrise hike": { price: 0, ratings: { hojin: 5, david: 5, andrew: 5, matt: 4 } },
+  "Thrift and latte loop": { price: 8, ratings: { david: 4, andrew: 5 } },
+  "Open mic night": { price: 5, ratings: { hojin: 5, david: 4, andrew: 4, matt: 5 } },
+  "Duckpin bowling": { price: 28, ratings: { hojin: 4, david: 5, matt: 3 } },
+  "Paint and sip": { ratings: { hojin: 4, david: 5, matt: 4 } },
+  "Rock Spot bouldering": { price: 30, ratings: { hojin: 4, matt: 5 } },
+  "A different view of the Charles": {
+    ratings: { hojin: 5, david: 5, matt: 5 },
+    comments: [{ by: "david", hoursAgo: 30, text: "Warmer than it looks from the bridge." }],
+  },
+  "Dumpling crawl": {
+    price: 18,
+    ratings: { david: 5, matt: 4 },
+    comments: [{ by: "matt", hoursAgo: 2, text: "The second place on Beach Street still wins." }],
+  },
+  "Midnight cookie run": { price: 6, ratings: { david: 5, john: 4, andrew: 5 } },
+  "Study break at the arboretum": { price: 0, ratings: { david: 4, john: 5 } },
+  "Trivia night": { price: 12, ratings: { david: 4, john: 3, andrew: 4 } },
+  "Castle Island loop": { price: 0, ratings: { hojin: 5, matt: 4 } },
+  "Escape room": { price: 35, ratings: { hojin: 5, matt: 5 } },
+  "Late-night pho": { price: 14, ratings: { hojin: 5, matt: 4 } },
+  "Axe throwing": { price: 30, ratings: { hojin: 5, matt: 4 } },
+};
 
 export const COMPETITORS: Record<"local" | "school" | "duos", Competitor[]> = {
   local: [
@@ -163,6 +210,7 @@ export function seed(now = new Date()): State {
       memberIds: SQ,
       plan: null,
       pastPlans: [pastPlan("p-mfa", "sq", "matt", 81, 3), pastPlan("p-hike", "sq", "hojin", 58, 20), pastPlan("p-kayak", "sq", "david", 2, 1)],
+      feed: [],
     },
     {
       id: "sb",
@@ -174,6 +222,7 @@ export function seed(now = new Date()): State {
       memberIds: SB,
       plan: null,
       pastPlans: [],
+      feed: [],
     },
     {
       id: "no",
@@ -184,31 +233,52 @@ export function seed(now = new Date()): State {
       memberIds: NO,
       plan: null,
       pastPlans: [],
+      feed: [],
     },
   ];
 
-  // Study Breakers has a plan in progress so the Votes tab has something to show.
-  const posted = new Date(now.getTime() - 26 * 36e5);
+  // Side Questers has a plan mid-vote so the new confirmation rules are visible immediately.
+  // Friday already has the host plus two others (one only partly free), which is enough to confirm.
+  const posted = new Date(now.getTime() - 20 * 36e5);
   const fri = nextFriday(now);
   const sat = (() => {
     const d = parseD(fri);
     d.setDate(d.getDate() + 1);
     return iso(d);
   })();
-  groups[1].plan = {
-    id: "p-pottery",
-    groupId: "sb",
-    title: "Pottery after hours",
-    where: "The Clayroom · 1408 Beacon St, Brookline",
-    date: fri,
-    time: "18:30",
-    note: "Let's try something new. Beginner-friendly, no skills required!",
-    byId: "john",
+  const o1 = { date: fri, time: "17:00" };
+  const o2 = { date: sat, time: "18:00" };
+  groups[0].plan = {
+    id: "p-giving",
+    groupId: "sq",
+    title: "Friendsgiving potluck",
+    where: "Andrew's place · Allston",
+    note: "Everyone brings one dish. Matt is on pie duty, no arguments.",
+    price: null,
+    est: estCost("Friendsgiving potluck", "Andrew's place · Allston"),
+    byId: "andrew",
+    hostId: "andrew",
     createdAt: posted.toISOString(),
-    inIds: ["john"],
-    outIds: [],
-    suggestions: [{ id: "s1", byId: "andrew", date: sat, time: "14:00", voterIds: ["andrew"] }],
+    extMs: 0,
+    auto: false,
+    pickId: null,
+    confirmedOptionId: null,
+    start: null,
+    goingIds: [],
+    requests: [],
+    options: [
+      { id: "o1", byId: "andrew", ...o1, resp: { andrew: { a: "yes" }, matt: { a: "yes" }, david: { a: "part", from: "18:30" } } },
+      { id: "o2", byId: "david", ...o2, resp: { david: { a: "yes" }, matt: { a: "maybe" } } },
+    ],
   };
+  groups[0].feed = [
+    { id: "f1", t: posted.getTime(), byId: "andrew", k: "post", title: "Friendsgiving potluck", opt: optLabel(o1) },
+    { id: "f2", t: now.getTime() - 18 * 36e5, byId: "matt", k: "resp", ans: "Yes", opt: optLabel(o1) },
+    { id: "f3", t: now.getTime() - 10 * 36e5, byId: "david", k: "resp", ans: "Partly (after 6:30 PM)", opt: optLabel(o1) },
+    { id: "f4", t: now.getTime() - 6 * 36e5, byId: "david", k: "suggest", opt: optLabel(o2) },
+    { id: "f5", t: now.getTime() - 4 * 36e5, byId: "matt", k: "resp", ans: "If needed", opt: optLabel(o2) },
+    { id: "f6", t: now.getTime() - 2 * 36e5, byId: "matt", k: "comment", title: "Dumpling crawl", text: "The second place on Beach Street still wins." },
+  ];
 
   const logs: ActivityLog[] = [];
   const chronological = [...RAW].sort((a, b) => b[2] - a[2]);
@@ -230,6 +300,15 @@ export function seed(now = new Date()): State {
       attendeeIds: who,
       media: [],
       eventId: plan?.id,
+      price: EXTRAS[title]?.price ?? null,
+      est: estCost(title, where, cat),
+      ratings: EXTRAS[title]?.ratings ?? {},
+      comments: (EXTRAS[title]?.comments ?? []).map((c, ci) => ({
+        id: `c${i}-${ci}`,
+        byId: c.by,
+        t: now.getTime() - c.hoursAgo * 36e5,
+        text: c.text,
+      })),
       points: scoreLog({ cat, labels, date, attendeeIds: who }, g.memberIds.length, logs, plan),
     });
   });

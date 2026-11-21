@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { ActivityLog, Group, Plan, State, User } from "./lib/types";
+import type { ActivityLog, Group, State, User } from "./lib/types";
+import { feedText, tickPlans } from "./lib/plans";
 import { seed, STATE_VERSION } from "./data/seed";
 
 /*
@@ -89,11 +90,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const update = useCallback((fn: (draft: State) => void) => {
     const draft = structuredClone(stateRef.current);
     fn(draft);
+    const notes = tickPlans(draft);
     if (!persist(draft)) return false;
     stateRef.current = draft;
     setState(draft);
+    for (const note of notes) toast(note);
     return true;
-  }, []);
+  }, [toast]);
+
+  // Plans with auto-confirm lock themselves in once voting closes, even if nobody is clicking.
+  useEffect(() => {
+    const run = () => {
+      const draft = structuredClone(stateRef.current);
+      const notes = tickPlans(draft);
+      if (!notes.length) return;
+      if (!persist(draft)) return;
+      stateRef.current = draft;
+      setState(draft);
+      for (const note of notes) toast(note);
+    };
+    const id = window.setInterval(run, 30_000);
+    return () => window.clearInterval(id);
+  }, [toast]);
 
   const value = useMemo<Store>(() => {
     const me = state.users.find((u) => u.id === sessionId) ?? null;
@@ -139,20 +157,14 @@ export function describeChanges(prev: State, next: State, meId: string): string[
   for (const g of next.groups) {
     if (!g.memberIds.includes(meId)) continue;
     const old = prev.groups.find((x) => x.id === g.id);
-    const p = g.plan;
-    const op: Plan | null | undefined = old?.plan;
     if (!old) {
       out.push(`You were added to ${g.name}`);
       continue;
     }
-    if (p && p.id !== op?.id && p.byId !== meId) out.push(`${name(p.byId)} posted “${p.title}” in ${g.name}`);
-    if (p && op && p.id === op.id) {
-      for (const id of p.inIds) if (!op.inIds.includes(id) && id !== meId) out.push(`${name(id)} is in for ${p.title}`);
-      for (const id of p.outIds) if (!op.outIds.includes(id) && id !== meId) out.push(`${name(id)} can't make ${p.title}`);
-      for (const s of p.suggestions)
-        if (!op.suggestions.some((x) => x.id === s.id) && s.byId !== meId) out.push(`${name(s.byId)} suggested a new time`);
-      if (p.confirmedAt && !op.confirmedAt) out.push(`${p.title} is locked in`);
-      if (p.date !== op.date || p.time !== op.time) out.push(`${p.title} moved to a new time`);
+    const seen = new Set(old.feed.map((f) => f.id));
+    for (const f of g.feed) {
+      if (seen.has(f.id) || f.byId === meId) continue;
+      out.push(`${name(f.byId)} ${feedText(f)}`);
     }
   }
   const newLogs: ActivityLog[] = next.logs.filter(

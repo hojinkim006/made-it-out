@@ -20,9 +20,10 @@ Types live in `web/src/lib/types.ts`.
 |---|---|
 | `User` | id, username (unique), email, phone, passHash, displayName, region, school?, friendIds |
 | `Group` | id, name, region, hood, school?, createdAt, memberIds (2–8), plan, pastPlans |
-| `Plan` | id, title, where, date, time, note, byId, createdAt, confirmedAt?, inIds, outIds, suggestions |
-| `Suggestion` | id, byId, date, time, voterIds |
-| `ActivityLog` | id, groupId, authorId, title, description, cat, emoji, labels, date, where, attendeeIds, media, eventId?, points |
+| `Plan` | id, title, where, note, price, est, byId, hostId, createdAt, extMs, auto, pickId, options[], confirmedOptionId, start, goingIds, requests, confirmedAt? |
+| `TimeOption` | id, byId, date, time, resp (yes / partly / if needed / no, with an optional window) |
+| `Group.feed` | live updates (posts, answers, confirms, handoffs, ratings, comments) |
+| `ActivityLog` | id, groupId, authorId, title, description, cat, emoji, labels, date, where, attendeeIds, media, eventId?, price, est, ratings, comments, points |
 
 ## Design
 

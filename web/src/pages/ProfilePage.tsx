@@ -8,12 +8,14 @@ import { findUser } from "../lib/auth";
 import { boardRows, isDuo } from "../lib/scoring";
 import { fmtD, fmtT, MON, parseD } from "../lib/dates";
 import { groupInfo, myPoints } from "../lib/groupInfo";
+import { activeOption, comingTo, responded, waitingIds } from "../lib/plans";
+import type { Group, Plan } from "../lib/types";
 import { COMPETITORS } from "../data/seed";
 
 const fmtN = (n: number) => n.toLocaleString("en-US");
 
 export function ProfilePage() {
-  const { me, state, myGroups, nameOf } = useStore();
+  const { me, state, myGroups } = useStore();
   const { go } = useNav();
   const [sheet, setSheet] = useState<"new" | null>(null);
   const [open, setOpen] = useState<{ logs: typeof state.logs; i: number } | null>(null);
@@ -28,8 +30,8 @@ export function ProfilePage() {
   // The next plan, preferring one I haven't answered yet.
   const plans = myGroups.filter((g) => g.plan).map((g) => ({ g, p: g.plan! }));
   const up =
-    plans.find(({ p }) => !p.inIds.includes(u.id) && !p.outIds.includes(u.id)) ??
-    plans.sort((a, b) => a.p.date.localeCompare(b.p.date))[0];
+    plans.find(({ p }) => !responded(p, u.id)) ??
+    [...plans].sort((a, b) => (activeOption(a.g.memberIds.length, a.p)?.date ?? "").localeCompare(activeOption(b.g.memberIds.length, b.p)?.date ?? ""))[0];
 
   const rankIn = (gid: string, duo: boolean) => {
     const rows = duo
@@ -122,46 +124,14 @@ export function ProfilePage() {
         </div>
         <aside className="stack">
           <section className="card horizon">
-            <div className="eyebrow">On the horizon</div>
+            <div className="eyebrow">{up && !responded(up.p, u.id) ? "Needs your vote" : "On the horizon"}</div>
             <h2>
               Something to look
               <br />
               forward to.
             </h2>
             {up ? (
-              <>
-                <div className="ev-card">
-                  <div className="event">
-                    <div className="dtile">
-                      <span>{MON[parseD(up.p.date).getMonth()]}</span>
-                      <b>{parseD(up.p.date).getDate()}</b>
-                    </div>
-                    <div className="ev-body">
-                      <h3>{up.p.title}</h3>
-                      <p className="muted">
-                        {fmtD(up.p.date, { weekday: "short" })} · {fmtT(up.p.time)}
-                      </p>
-                      <p className="muted">{up.p.where.split("·")[0].trim()}</p>
-                      <p className="muted">
-                        {up.g.name} · by {nameOf(up.p.byId)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="ev-meta">
-                    <span className="avs">
-                      {up.p.inIds.slice(0, 5).map((id) => (
-                        <Avatar key={id} name={nameOf(id)} me={id === u.id} />
-                      ))}
-                    </span>
-                    <span className="muted">
-                      {up.p.inIds.length} going · {up.g.memberIds.length - up.p.inIds.length - up.p.outIds.length} haven't answered
-                    </span>
-                  </div>
-                </div>
-                <button className="btn btn-primary block" onClick={() => go("group", { groupId: up.g.id, tab: "votes" })}>
-                  {up.p.inIds.includes(u.id) || up.p.outIds.includes(u.id) ? "View hangout" : "Answer now"} <Icon name="arrow" />
-                </button>
-              </>
+              <Horizon plan={up} meId={u.id} />
             ) : (
               <div className="empty">
                 <p>Nothing planned yet. Your next good story starts with a plan.</p>
@@ -265,5 +235,52 @@ function Friends() {
         ))}
       </div>
     </section>
+  );
+}
+
+function Horizon({ plan, meId }: { plan: { g: Group; p: Plan }; meId: string }) {
+  const { nameOf } = useStore();
+  const { go } = useNav();
+  const { g, p } = plan;
+  const o = activeOption(g.memberIds.length, p);
+  if (!o) return null;
+  const when = p.confirmedOptionId ? p.start || o.time : o.time;
+  const people = p.confirmedOptionId ? p.goingIds : comingTo(o);
+  const waiting = waitingIds(g.memberIds, p).length;
+  const d = parseD(o.date);
+  return (
+    <>
+      <div className="ev-card">
+        <div className="event">
+          <div className="dtile">
+            <span>{MON[d.getMonth()]}</span>
+            <b>{d.getDate()}</b>
+          </div>
+          <div className="ev-body">
+            <h3>{p.title}</h3>
+            <p className="muted">
+              {fmtD(o.date, { weekday: "short" })} · {fmtT(when)}
+              {p.confirmedOptionId ? " · Confirmed" : p.options.length > 1 ? ` · leading of ${p.options.length} times` : ""}
+            </p>
+            <p className="muted">
+              {p.where.split("·")[0].trim()} · {g.name}
+            </p>
+          </div>
+        </div>
+        <div className="ev-meta">
+          <span className="avs">
+            {people.slice(0, 5).map((id) => (
+              <Avatar key={id} name={nameOf(id)} me={id === meId} />
+            ))}
+          </span>
+          <span className="muted">
+            {people.length} in · {p.confirmedOptionId ? "confirmed" : `${waiting} waiting`}
+          </span>
+        </div>
+      </div>
+      <button className="btn btn-primary block" onClick={() => go("group", { groupId: g.id, tab: "votes" })}>
+        {responded(p, meId) ? "See the votes" : "Vote on a time"} <Icon name="arrow" />
+      </button>
+    </>
   );
 }
