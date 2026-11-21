@@ -360,7 +360,7 @@ function BudgetCard({ logs, plan }: { logs: ActivityLog[]; plan: Plan | null }) 
           Next up: {plan.title} <CostTag item={plan} />
         </p>
       )}
-      <p className="hint-line">Prices people entered count as-is. Everything else uses the estimate. Gemini estimates are simulated in this demo.</p>
+      <p className="hint-line">Prices people entered count as-is. Everything else uses the estimate: Gemini when GEMINI_API_KEY is set, otherwise a built-in price list.</p>
     </section>
   );
 }

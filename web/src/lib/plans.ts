@@ -1,5 +1,5 @@
 import { estCost } from "./budget";
-import type { AnswerKind, FeedItem, Group, Plan, State, TimeAnswer, TimeOption } from "./types";
+import type { AnswerKind, CostRange, FeedItem, Group, Plan, State, TimeAnswer, TimeOption } from "./types";
 import { fmtD, fmtT, parseD } from "./dates";
 
 /**
@@ -273,6 +273,10 @@ export function postPlan(
     byId: string;
     auto: boolean;
     price?: number | null;
+    /** Live estimate from the form (Gemini or fallback). Falls back to estCost. */
+    est?: CostRange | null;
+    tag?: string | null;
+    people?: number;
     options: NewOption[];
   },
   now = new Date(),
@@ -289,7 +293,9 @@ export function postPlan(
     note: plan.note,
     placeId: plan.placeId,
     price: plan.price ?? null,
-    est: estCost(plan.title, plan.where),
+    est: plan.est !== undefined ? plan.est : estCost(plan.title, plan.where),
+    tag: plan.tag ?? null,
+    people: plan.people,
     byId: plan.byId,
     hostId: plan.byId,
     createdAt: now.toISOString(),

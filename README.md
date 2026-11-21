@@ -14,6 +14,8 @@ Make scheduling hangouts with friends faster and more fun. Groups post events, m
 
 - **Real Boston data**: log at real places (OpenStreetMap) with nicheness from Yelp + OSM counts; "Try something new" suggests rare spots and upcoming city events. See [docs/DATA.md](docs/DATA.md).
 
+- **Gemini plan insights**: while you type a plan ("dinner at dominos for five of us") Gemini estimates the cost per person and total for the headcount, and adds a tag like #dinner. Without a key it falls back to a built-in price list and keyword tags.
+
 Planned: Gemini auto-labels for log titles.
 
 ## Repo layout
@@ -34,6 +36,8 @@ docs/         architecture, scoring rules, data sources
 ```bash
 cd web && npm install && npm run dev
 ```
+
+For live Gemini estimates, copy `web/.env.example` to `web/.env.local` and set `GEMINI_API_KEY` (get one at https://aistudio.google.com/apikey). The key is read only by the Vite server at `/api/plan-insight` and never reaches the browser.
 
 Data pipeline (optional, needs datasets downloaded; see [docs/DATA.md](docs/DATA.md)):
 

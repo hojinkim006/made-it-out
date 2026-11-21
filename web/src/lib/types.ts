@@ -138,6 +138,10 @@ export interface Plan {
   placeId?: string;
   price: number | null;
   est: CostRange | null;
+  /** Auto tag from what was typed, e.g. "dinner". Shown as #dinner. */
+  tag?: string | null;
+  /** Headcount the estimate assumed ("for five of us"). */
+  people?: number;
   byId: ID; // who posted it
   hostId: ID; // who must be free, and who confirms
   createdAt: string; // ISO datetime posted; reset when voting reopens

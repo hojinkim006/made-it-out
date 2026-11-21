@@ -125,6 +125,7 @@ export function NextUp({ g }: { g: Group }) {
       <div className="pills">
         {!p.confirmedOptionId && <span className="tag">{left > 0 ? `Voting closes in ${fmtLeft(left)}` : "Voting closed"}</span>}
         <CostTag item={p} />
+        {p.tag && <span className="tag">#{p.tag}</span>}
         {!p.confirmedOptionId && !p.options.some((opt) => opt.resp[me!.id]) && <span className="tag warn">Waiting on your answer</span>}
         {p.hostId === me!.id && hostCalls.length > 0 && <span className="tag warn">A new time needs your answer</span>}
       </div>
@@ -277,6 +278,7 @@ export function VotesTab({ g }: { g: Group }) {
         {p.note && <div className="quote">“{p.note}”</div>}
         <div className="pills">
           <CostTag item={p} />
+        {p.tag && <span className="tag">#{p.tag}</span>}
           {p.price == null && p.est && <span className="tag">Gemini estimate (simulated)</span>}
         </div>
         <Banner

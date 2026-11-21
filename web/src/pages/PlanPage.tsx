@@ -4,7 +4,9 @@ import { useNav } from "../nav";
 import { Icon } from "../components/Icons";
 import { fmtD, fmtT, nextFriday, parseD, iso, todayISO } from "../lib/dates";
 import { postPlan } from "../lib/plans";
-import { estCost, fmtRange } from "../lib/budget";
+import { fmtRange } from "../lib/budget";
+import { totalRange } from "../lib/insight";
+import { usePlanInsight } from "../lib/useInsight";
 import { PlaceSearch } from "../components/PlaceSearch";
 import { TryNext } from "../components/TryNext";
 import { spotById, usePlaceData, type Spot } from "../lib/places";
@@ -32,8 +34,12 @@ export function PlanPage() {
   const [note, setNote] = useState("");
   const [price, setPrice] = useState("");
   const [bad, setBad] = useState<string | null>(null);
+  const [tagOff, setTagOff] = useState(false);
   const g = myGroups.find((x) => x.id === gid) ?? myGroups[0];
+  const ins = usePlanInsight(title, where, g?.memberIds.length ?? 1);
   if (!g) return <p className="muted">Create a group first.</p>;
+  const est = ins?.priced ? { lo: ins.lo, hi: ins.hi } : null;
+  const tag = tagOff ? null : (ins?.tag ?? null);
 
   const pick = (s: Spot) => {
     setPlaceId(s.id);
@@ -49,7 +55,7 @@ export function PlanPage() {
     if (typed !== null && (Number.isNaN(typed) || typed < 0)) return setBad("price");
     const options = [{ id: uid(), date, time: time || "18:00" }];
     if (alt && date2 && !(date2 === date && (time2 || "18:00") === (time || "18:00"))) options.push({ id: uid(), date: date2, time: time2 || "18:00" });
-    update((s) => postPlan(s, g.id, { id: uid(), title: title.trim(), where: where.trim() || "Location TBD", note: note.trim(), placeId, byId: me!.id, auto, price: typed, options }));
+    update((s) => postPlan(s, g.id, { id: uid(), title: title.trim(), where: where.trim() || "Location TBD", note: note.trim(), placeId, byId: me!.id, auto, price: typed, est, tag, people: ins?.people, options }));
     go("group", { groupId: g.id, tab: "votes" });
     toast(`Shared with ${g.name}. Everyone sees it now.`);
   };
@@ -70,7 +76,17 @@ export function PlanPage() {
           <h2>The plan</h2>
           <label className="f">
             <span>What are we doing?</span>
-            <input className={`field${bad === "title" ? " err" : ""}`} value={title} onChange={(e) => (setTitle(e.target.value), setBad(null))} placeholder="Dinner" autoFocus />
+            <input className={`field${bad === "title" ? " err" : ""}`} value={title} onChange={(e) => (setTitle(e.target.value), setBad(null))} placeholder="Dinner at Domino's for five of us" autoFocus />
+            {tag && (
+              <span className="row gap" style={{ marginTop: 8 }}>
+                <button type="button" className="tag" title="Remove tag" onClick={() => setTagOff(true)}>
+                  #{tag} <Icon name="x" />
+                </button>
+                <small className="hint" style={{ margin: 0 }}>
+                  {ins?.source === "gemini" ? "Tagged by Gemini" : "Auto tag"}
+                </small>
+              </span>
+            )}
           </label>
           <div className="f">
             <span>Where?</span>
@@ -94,7 +110,19 @@ export function PlanPage() {
               <span>$</span>
               <input className={`field${bad === "price" ? " err" : ""}`} type="number" min={0} step={1} inputMode="decimal" placeholder="Leave blank to use the estimate" value={price} onChange={(e) => (setPrice(e.target.value), setBad(null))} />
             </div>
-            <small className="hint">{estCost(title, where) ? `Gemini estimate (simulated): ${fmtRange(estCost(title, where))} per person` : "Add a place and we can estimate the cost."}</small>
+            <small className="hint">
+              {!est || !ins
+                ? ins?.loading
+                  ? "Asking Gemini…"
+                  : "Describe the plan or add a place and we can estimate the cost."
+                : `${ins.source === "gemini" ? "Gemini estimate" : "Rough estimate"}: ${fmtRange(est)} per person · ${fmtRange(totalRange(est, ins.people))} total for ${ins.people}${ins.loading ? " · updating…" : ""}`}
+              {ins?.source === "gemini" && ins.basis && (
+                <>
+                  <br />
+                  {ins.basis}
+                </>
+              )}
+            </small>
           </label>
           <div className="f2">
             <label className="f">
@@ -201,8 +229,14 @@ export function PlanPage() {
               )}
               <div>
                 <span>Cost per person</span>
-                <span>{price.trim() !== "" ? (Number(price) ? `$${Math.round(Number(price))}` : "Free") : estCost(title, where) ? `~${fmtRange(estCost(title, where))} (est.)` : "—"}</span>
+                <span>{price.trim() !== "" ? (Number(price) ? `$${Math.round(Number(price))}` : "Free") : est ? `~${fmtRange(est)} (est.)` : "—"}</span>
               </div>
+              {tag && (
+                <div>
+                  <span>Tag</span>
+                  <span>#{tag}</span>
+                </div>
+              )}
               <div>
                 <span>Sending to</span>
                 <span>
