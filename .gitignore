@@ -1,0 +1,30 @@
+# deps / builds
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# datasets: Yelp is ~4 GB, never commit raw data
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+!data/processed/sample_*.json
+
+# env / secrets
+.env
+.env.*
+!.env.example
+
+# os / editors
+.DS_Store
+.vscode/
+.idea/

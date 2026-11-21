@@ -1,0 +1,31 @@
+name: Feature
+description: Propose a new feature or improvement
+labels: ["feature"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Profile tab
+        - Group tab (tree, members, events, log history)
+        - Leaderboard tab
+        - Activity logging
+        - Event proposals / voting
+        - Scoring (nicheness, bonuses)
+        - Data pipeline (Yelp, Boston events, Maps)
+        - Infra / CI
+    validations:
+      required: true
+  - type: textarea
+    id: story
+    attributes:
+      label: User story
+      placeholder: As a group member, I want to ___ so that ___.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: "- [ ] ..."
