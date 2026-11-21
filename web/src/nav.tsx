@@ -9,6 +9,8 @@ export interface Route {
   tab?: GroupTab;
   /** Index of a newly grown branch to animate. */
   grow?: number | null;
+  /** Prefill for the plan form, e.g. from a suggested place. */
+  prefill?: { title: string; where: string; placeId?: string; date?: string };
 }
 
 export interface Nav {

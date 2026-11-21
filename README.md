@@ -12,7 +12,9 @@ Make scheduling hangouts with friends faster and more fun. Groups post events, m
 - **Scoring**: nicheness > group turnout > finalization speed > Krillion bonus > holiday bonus, plus streaks and decay. See [docs/SCORING.md](docs/SCORING.md).
 - **Leaderboards**: local (by region), my school, duos.
 
-Planned: Gemini auto-labels for log titles; dataset-driven nicheness and Krillion detection.
+- **Real Boston data**: log at real places (OpenStreetMap) with nicheness from Yelp + OSM counts; "Try something new" suggests rare spots and upcoming city events. See [docs/DATA.md](docs/DATA.md).
+
+Planned: Gemini auto-labels for log titles.
 
 ## Repo layout
 

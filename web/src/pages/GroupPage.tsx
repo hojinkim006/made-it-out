@@ -10,6 +10,7 @@ import { fmtD, fmtT, MON, parseD } from "../lib/dates";
 import { groupInfo, since } from "../lib/groupInfo";
 import { adoptSuggestion, cancelPlan, lockIn, memberStatus, respond, suggestTime, toggleVote, type MemberStatus } from "../lib/plans";
 import { COMPETITORS } from "../data/seed";
+import { TryNext } from "../components/TryNext";
 import type { Group, Plan } from "../lib/types";
 
 const fmtN = (n: number) => n.toLocaleString("en-US");
@@ -167,6 +168,7 @@ export function GroupPage() {
           <div className="grid-2">
             <div className="stack">
               <NextUp g={g} onSuggest={() => setSheet("suggest")} />
+              <TryNext g={g} />
               <section className="card pad">
                 <div className="card-head">
                   <div>

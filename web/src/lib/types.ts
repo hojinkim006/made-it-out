@@ -45,6 +45,7 @@ export interface ActivityLog {
   attendeeIds: ID[];
   media: Media[];
   eventId?: ID; // set when logged from a planned event
+  placeId?: string; // OSM place ("node/123") or Boston event ("event/PUB1") from web/public/data
   points: PointBreakdown;
 }
 
@@ -64,6 +65,7 @@ export interface Plan {
   date: string;
   time: string; // HH:MM
   note: string;
+  placeId?: string;
   byId: ID;
   createdAt: string; // ISO datetime posted
   confirmedAt?: string; // ISO datetime locked in

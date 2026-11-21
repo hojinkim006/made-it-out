@@ -20,7 +20,7 @@ export default function App() {
   const menuRef = useRef<HTMLDivElement>(null);
 
   const go = useCallback((view: View, opts: Omit<Route, "view"> = {}) => {
-    setRoute((r) => ({ view, groupId: opts.groupId ?? r.groupId, tab: opts.tab ?? (view === "group" ? "overview" : r.tab), grow: opts.grow ?? null }));
+    setRoute((r) => ({ view, groupId: opts.groupId ?? r.groupId, tab: opts.tab ?? (view === "group" ? "overview" : r.tab), grow: opts.grow ?? null, prefill: opts.prefill }));
     setAnimKey((k) => k + 1);
     setMenu(false);
     window.scrollTo({ top: 0 });
@@ -120,7 +120,7 @@ export default function App() {
         <div className="foot">
           <span>Less group chat. More good stories.</span>
           <span>
-            Boston · Demo data{" "}
+            Places © OpenStreetMap contributors · Boston · Demo data{" "}
             <button
               onClick={() => {
                 if (confirm("Reset all demo data in every open window?")) reset();

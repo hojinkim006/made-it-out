@@ -56,9 +56,24 @@ export const normLabel = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-export function nicheness(cat: Cat, labels: string[]): number {
-  const fromLabels = labels.map((l) => LABEL_NICHE[normLabel(l)] ?? 0);
-  return Math.max(CATS[cat].niche, ...fromLabels);
+export interface NicheSources {
+  /** Label scores from the data pipeline (web/public/data/nicheness.json). */
+  labelNiche?: Record<string, number>;
+  /** Nicheness of the specific place or event that was picked. */
+  placeNiche?: number;
+}
+
+/**
+ * Nicheness in [0, 1]. With a picked place, the dataset score for that place
+ * replaces the self-chosen category (so picking "Water" can't inflate a café).
+ */
+export function nicheness(cat: Cat, labels: string[], src: NicheSources = {}): number {
+  const fromLabels = labels.map((l) => {
+    const k = normLabel(l);
+    return src.labelNiche?.[k] ?? LABEL_NICHE[k] ?? 0;
+  });
+  const base = src.placeNiche ?? CATS[cat].niche;
+  return Math.max(base, ...fromLabels);
 }
 
 /** Nonlinear in the share of the group that showed up, so 2 of 8 can't farm points. */
@@ -119,8 +134,9 @@ export function scoreLog(
   memberCount: number,
   earlier: Pick<ActivityLog, "labels" | "cat" | "date">[],
   plan?: Pick<Plan, "createdAt" | "confirmedAt">,
+  src: NicheSources = {},
 ): PointBreakdown {
-  const niche = Math.round(nicheness(log.cat, log.labels) * NICHE_MAX);
+  const niche = Math.round(nicheness(log.cat, log.labels, src) * NICHE_MAX);
   const turnout = turnoutPoints(log.attendeeIds.length, memberCount);
   const speed = speedPoints(plan);
   const krillion = isKrillion(log, earlier) ? KRILLION_BONUS : 0;

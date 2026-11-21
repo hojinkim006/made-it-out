@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore, uid } from "../store";
 import { useNav } from "../nav";
 import { CatIcon, Icon } from "../components/Icons";
+import { NicheTag, PlaceSearch } from "../components/PlaceSearch";
+import { nichePercentile, spotById, usePlaceData, type Spot } from "../lib/places";
 import { MAX_FRUIT } from "../components/Tree";
 import { CATS, normLabel, scoreLog } from "../lib/scoring";
 import { todayISO } from "../lib/dates";
@@ -52,14 +54,23 @@ export function LogPage() {
   const [desc, setDesc] = useState("");
   const [media, setMedia] = useState<Media[]>([]);
   const [linkPlan, setLinkPlan] = useState(!!g?.plan?.confirmedAt);
+  const [placeId, setPlaceId] = useState<string | undefined>(g?.plan?.confirmedAt ? g.plan.placeId : undefined);
+  const data = usePlaceData();
+  const spot = data ? spotById(data, placeId) : null;
   const [bad, setBad] = useState(false);
   const [shown, setShown] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const plan = linkPlan ? (g?.plan ?? undefined) : undefined;
   const pts = useMemo(
-    () => (g ? scoreLog({ cat, labels, date: date || todayISO(), attendeeIds: who }, g.memberIds.length, state.logs, plan) : null),
-    [g, cat, labels, date, who, state.logs, plan],
+    () =>
+      g
+        ? scoreLog({ cat, labels, date: date || todayISO(), attendeeIds: who }, g.memberIds.length, state.logs, plan, {
+            labelNiche: data?.labels,
+            placeNiche: spot?.niche,
+          })
+        : null,
+    [g, cat, labels, date, who, state.logs, plan, data, spot],
   );
 
   // Count-up animation for the big number, as in the original design.
@@ -86,6 +97,16 @@ export function LogPage() {
     setGid(id);
     setWho(ng.memberIds);
     setLinkPlan(!!ng.plan?.confirmedAt);
+  };
+
+  const pick = (s: Spot) => {
+    setPlaceId(s.id);
+    setWhere(`${s.name} · ${s.hood}`);
+    setCat(s.cat);
+    setEmoji(s.emoji);
+    setLabels((ls) => [...s.labels, ...ls.filter((l) => !s.labels.includes(l))]);
+    if (!title.trim()) setTitle(s.date ? s.name : `${s.kindLabel} at ${s.name}`);
+    if (s.date && s.date <= todayISO()) setDate(s.date);
   };
 
   const addLabel = () => {
@@ -124,6 +145,7 @@ export function LogPage() {
       attendeeIds: g.memberIds.filter((m) => who.includes(m)),
       media,
       eventId: plan?.id,
+      placeId: spot?.id,
       points: pts,
     };
     const ok = update((s) => {
@@ -174,6 +196,7 @@ export function LogPage() {
                     setTitle(g.plan!.title);
                     setWhere(g.plan!.where);
                     setWho(g.plan!.inIds.length ? g.plan!.inIds : g.memberIds);
+                    setPlaceId(g.plan!.placeId);
                   }
                 }}
               />
@@ -184,10 +207,36 @@ export function LogPage() {
             <span>Activity</span>
             <input className={`field${bad ? " err" : ""}`} value={title} onChange={(e) => (setTitle(e.target.value), setBad(false))} placeholder="A different view of the Charles" />
           </label>
-          <label className="f">
-            <span>Location</span>
-            <input className="field" value={where} onChange={(e) => setWhere(e.target.value)} placeholder="Charles River Canoe & Kayak · Allston" />
-          </label>
+          <div className="f">
+            <span>
+              Location <em>pick a real place to score its nicheness from the datasets</em>
+            </span>
+            <PlaceSearch
+              data={data}
+              value={where}
+              picked={spot}
+              onText={(v) => {
+                setWhere(v);
+                setPlaceId(undefined);
+              }}
+              onPick={pick}
+            />
+            {spot && data && (
+              <div className="picked">
+                <span className="place-emoji">{spot.emoji}</span>
+                <span className="t">
+                  <b>
+                    {spot.kindLabel} · nicheness {spot.niche.toFixed(2)}
+                  </b>
+                  <span className="muted">{spot.detail}</span>
+                </span>
+                <NicheTag niche={spot.niche} data={data} />
+                <button className="link" onClick={() => setPlaceId(undefined)}>
+                  Clear
+                </button>
+              </div>
+            )}
+          </div>
           <div className="f2">
             <label className="f">
               <span>When?</span>
@@ -235,7 +284,7 @@ export function LogPage() {
                 >
                   <CatIcon cat={k} />
                   {CATS[k].label}
-                  <span className="bonus">niche +{Math.round(CATS[k].niche * 100)}</span>
+                  <span className="bonus">{spot ? "tree icon" : `niche +${Math.round(CATS[k].niche * 100)}`}</span>
                 </button>
               ))}
             </div>
@@ -308,7 +357,15 @@ export function LogPage() {
             <div className="big-pts">{shown}</div>
             <p className="muted small">points for this log</p>
             <div className="breakdown">
-              {row("Nicheness", pts.niche, labels.length ? "category or rarest label" : CATS[cat].label)}
+              {row(
+                "Nicheness",
+                pts.niche,
+                spot && data
+                  ? `${spot.name}, rarer than ${nichePercentile(data, spot.niche)}% of Boston spots`
+                  : labels.length
+                    ? "category or rarest label"
+                    : CATS[cat].label,
+              )}
               {row("Group turnout", pts.turnout, `${who.length} of ${g.memberIds.length}`)}
               {row("Finalization speed", pts.speed, plan ? (plan.confirmedAt ? "linked plan" : "plan not locked in") : "no plan linked")}
               {row("Krillion bonus", pts.krillion, pts.krillion ? "first in the app this month" : "already done this month")}

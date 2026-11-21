@@ -2,26 +2,40 @@ import { useState } from "react";
 import { useStore, uid } from "../store";
 import { useNav } from "../nav";
 import { Icon } from "../components/Icons";
-import { fmtD, fmtT, nextFriday } from "../lib/dates";
+import { fmtD, fmtT, nextFriday, todayISO } from "../lib/dates";
 import { postPlan } from "../lib/plans";
+import { PlaceSearch } from "../components/PlaceSearch";
+import { TryNext } from "../components/TryNext";
+import { spotById, usePlaceData, type Spot } from "../lib/places";
 
 export function PlanPage() {
   const { me, myGroups, update, toast } = useStore();
   const { route, go } = useNav();
   const [gid, setGid] = useState(route.groupId ?? myGroups[0]?.id);
-  const [title, setTitle] = useState("");
-  const [where, setWhere] = useState("");
-  const [date, setDate] = useState(nextFriday());
+  const pre = route.prefill;
+  const [title, setTitle] = useState(pre?.title ?? "");
+  const [where, setWhere] = useState(pre?.where ?? "");
+  const [placeId, setPlaceId] = useState(pre?.placeId);
+  const [date, setDate] = useState(pre?.date && pre.date >= todayISO() ? pre.date : nextFriday());
+  const data = usePlaceData();
+  const spot = data ? spotById(data, placeId) : null;
   const [time, setTime] = useState("18:30");
   const [note, setNote] = useState("");
   const [bad, setBad] = useState<string | null>(null);
   const g = myGroups.find((x) => x.id === gid) ?? myGroups[0];
   if (!g) return <p className="muted">Create a group first.</p>;
 
+  const pick = (s: Spot) => {
+    setPlaceId(s.id);
+    setWhere(`${s.name} · ${s.hood}`);
+    if (!title.trim()) setTitle(s.date ? s.name : `${s.kindLabel} at ${s.name}`);
+    if (s.date && s.date >= todayISO()) setDate(s.date);
+  };
+
   const share = () => {
     if (!title.trim()) return setBad("title");
     if (!date) return setBad("date");
-    update((s) => postPlan(s, g.id, { id: uid(), title: title.trim(), where: where.trim() || "Location TBD", date, time: time || "18:00", note: note.trim(), byId: me!.id }));
+    update((s) => postPlan(s, g.id, { id: uid(), title: title.trim(), where: where.trim() || "Location TBD", date, time: time || "18:00", note: note.trim(), placeId, byId: me!.id }));
     go("group", { groupId: g.id, tab: "votes" });
     toast(`Shared with ${g.name}. Everyone sees it now.`);
   };
@@ -44,10 +58,20 @@ export function PlanPage() {
             <span>What are we doing?</span>
             <input className={`field${bad === "title" ? " err" : ""}`} value={title} onChange={(e) => (setTitle(e.target.value), setBad(null))} placeholder="Dinner" autoFocus />
           </label>
-          <label className="f">
+          <div className="f">
             <span>Where?</span>
-            <input className="field" value={where} onChange={(e) => setWhere(e.target.value)} placeholder="Dumpling House · Cambridge" />
-          </label>
+            <PlaceSearch
+              data={data}
+              value={where}
+              picked={spot}
+              onText={(v) => {
+                setWhere(v);
+                setPlaceId(undefined);
+              }}
+              onPick={pick}
+              placeholder="Search Boston places, or type anything"
+            />
+          </div>
           <div className="f2">
             <label className="f">
               <span>Date</span>
@@ -76,6 +100,7 @@ export function PlanPage() {
           </label>
         </section>
         <aside className="stack">
+          <TryNext g={g} onPick={pick} />
           <section className="card pad steps">
             <h3>
               Less back-and-forth.
