@@ -4,7 +4,7 @@ Plan hangouts with friends without the group chat. A group posts a plan, members
 
 | | |
 |---|---|
-| Live app | https://madeitout.netlify.app/ |
+| Live app | https://made-it-out.netlify.app/ |
 | Supabase dashboard (team members) | https://supabase.com/dashboard/project/vmvggjcyjfklirgfgyfu |
 
 ## Features
