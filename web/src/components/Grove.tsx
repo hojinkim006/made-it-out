@@ -93,24 +93,51 @@ function Tag({ names, label, plant }: { names: { id: string; name: string }[]; l
   );
 }
 
+const BLADE_GREENS = ["#4f8f3a", "#3d7a30", "#6aa84b", "#5a9a40"];
+const BLOOMS = ["#fffaf0", "#ffe08a", "#f6c1cf"];
+
+/** A small tuft of tapered blades rooted at (x, y). Deterministic so it never shifts between renders. */
+function bladeTuft(x: number, y: number, h: number, k: number) {
+  return [-6, 0, 6].map((dx, j) => {
+    const bh = h * (j === 1 ? 1 : 0.62 + ((k + j) % 3) * 0.08);
+    const bend = (j - 1) * 7 + ((k * 3 + j) % 5) - 2;
+    const bx = x + dx * 0.7;
+    return `M${bx - 2} ${y} Q${bx + bend * 0.3} ${y - bh * 0.55} ${bx + bend} ${y - bh} Q${bx + bend * 0.3 + 1.6} ${y - bh * 0.5} ${bx + 2} ${y} Z`;
+  });
+}
+
+const GROVE_TUFTS = Array.from({ length: 30 }, (_, k) => {
+  const x = 20 + k * 40 + ((k * 37) % 23) - 11;
+  const band = k % 3; // back, middle, front
+  const y = [74, 94, 116][band] + ((k * 13) % 5);
+  const h = [10, 15, 22][band] + ((k * 7) % 6);
+  return { x, y, h, k, color: BLADE_GREENS[(k * 5) % BLADE_GREENS.length], o: [0.55, 0.75, 0.95][band] };
+});
+
+const GROVE_BLOOMS = Array.from({ length: 12 }, (_, k) => ({
+  x: 60 + k * 98 + ((k * 29) % 31),
+  y: 86 + ((k * 17) % 26),
+  r: 2.2 + (k % 3) * 0.5,
+  c: BLOOMS[k % BLOOMS.length],
+}));
+
 function Ground() {
   return (
     <svg className="grove-ground" viewBox="0 0 1200 120" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-      <defs>
-        <pattern id="grove-blades" width="54" height="40" patternUnits="userSpaceOnUse">
-          <path d="M8 40 C9 28 5 18 4 10" stroke="#4c8a36" strokeWidth="1.6" fill="none" strokeLinecap="round" />
-          <path d="M22 40 C20 26 26 16 23 8" stroke="#2d6830" strokeWidth="1.8" fill="none" strokeLinecap="round" />
-          <path d="M36 40 C38 30 33 20 38 12" stroke="#74b456" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-          <path d="M14 40 C15 32 11 24 12 16" stroke="#3d7632" strokeWidth="1.2" fill="none" strokeLinecap="round" />
-        </pattern>
-      </defs>
-      <rect x="0" y="28" width="1200" height="92" fill="url(#grove-blades)" opacity=".55" />
-      <path d="M0 78 Q200 68 400 76 T800 72 T1200 78 V120 H0 Z" fill="#5f9844" opacity=".22" />
-      <path d="M0 96 Q280 88 560 96 T1200 92 V120 H0 Z" fill="#2f642c" opacity=".18" />
-      {[70, 210, 360, 520, 680, 840, 1000, 1140].map((x, i) => (
-        <g key={x} transform={`translate(${x} 112)`}>
-          <path d={`M0 0 C${i % 2 ? -4 : 3} -22 ${i % 2 ? -8 : 6} -36`} stroke={i % 3 ? "#3c7832" : "#68aa4c"} strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d={`M0 0 C${i % 2 ? 6 : -4} -16 ${i % 2 ? 10 : -8} -28`} stroke="#2c6228" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      <path d="M0 70 C160 58 320 66 520 62 S900 52 1200 64 V120 H0 Z" fill="#8cc066" opacity=".45" />
+      <path d="M0 88 C220 78 420 92 660 84 S1020 76 1200 86 V120 H0 Z" fill="#6aa648" opacity=".5" />
+      <path d="M0 106 C280 98 600 108 880 102 S1100 100 1200 104 V120 H0 Z" fill="#4e8c37" opacity=".55" />
+      {GROVE_TUFTS.map((t) => (
+        <g key={t.k} fill={t.color} opacity={t.o}>
+          {bladeTuft(t.x, t.y, t.h, t.k).map((d, j) => (
+            <path key={j} d={d} />
+          ))}
+        </g>
+      ))}
+      {GROVE_BLOOMS.map((b, k) => (
+        <g key={k}>
+          <path d={`M${b.x} ${b.y + 8} Q${b.x + 1} ${b.y + 4} ${b.x} ${b.y}`} stroke="#3d7a30" strokeWidth="1.2" fill="none" />
+          <circle cx={b.x} cy={b.y} r={b.r} fill={b.c} />
         </g>
       ))}
     </svg>

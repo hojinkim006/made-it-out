@@ -129,7 +129,9 @@ h3{font-size:17px;letter-spacing:-.02em;font-weight:600}
 .grove-tree-body{width:100%;transform-origin:50% 100%;animation:groveBreeze var(--dur,3.6s) ease-in-out infinite;animation-delay:var(--lag,0s)}
 .grove-item:hover .grove-tree-body,.grove-item:focus-visible .grove-tree-body{animation:groveShake .8s ease-in-out}
 .grove-row .tree-wrap{margin:0;max-width:none}
-.grove-row .tree .ground,.grove-row .tree .shade,.grove-row .tree .grass{opacity:0}
+.grove-row .tree .ground,.grove-row .tree .grass{display:none}
+.grove-row .tree .shade{fill:rgba(30,60,20,.22)}
+.grove-row .tree .ground-shadow{fill:rgba(30,60,20,.18)}
 .grove-row .tree .future,.grove-row .tree .buds{display:none}
 .grove-row .tree.bloom .sway{animation:none}
 @keyframes groveBreeze{0%,100%{transform:rotate(-1.05deg)}50%{transform:rotate(1.2deg)}}
@@ -218,24 +220,35 @@ h3{font-size:17px;letter-spacing:-.02em;font-weight:600}
 /* tree svg */
 .tree .canopy .back{fill:#9dcf78}
 .tree .canopy .front{fill:#d7f0c2;opacity:.9}
-.tree .shade{fill:rgba(111,158,72,.2)}
-.tree .ground{fill:rgba(90,70,40,.08)}
-.tree .trunk{fill:var(--wood)}
-.tree .bark{fill:none;stroke:rgba(255,236,210,.45);stroke-width:5;stroke-linecap:round}
-.tree .groove{fill:none;stroke:rgba(62,36,18,.32);stroke-width:2.2;stroke-linecap:round}
-.tree .roots path{stroke:var(--wood);stroke-width:4;fill:none;stroke-linecap:round}
-.tree .branches path{fill:none;stroke:var(--wood);stroke-linecap:round}
-.tree .grass path{fill:none;stroke:#6fa84e;stroke-width:3;stroke-linecap:round}
+.tree .shade{fill:rgba(111,158,72,.16)}
+.tree .ground{fill:var(--t-ground)}
+.tree .ground-shadow{fill:rgba(40,60,20,.14)}
+.tree{--t-wood:var(--wood);--t-leaf-a:#4f9d56;--t-leaf-b:#3e8a4a;--t-leaf-c:#6aad5a;--t-leaf-line:#2f6e38;--t-deep:#4f9150;--t-mid:#7cb766;--t-light:#a9d68c;--t-grass-a:#5f9e45;--t-grass-b:#467f36;--t-grass-c:#7fb85c;--t-ground:#b9d79a}
+.tree .trunk{fill:var(--t-wood)}
+.tree .trunk-shade{fill:rgba(50,24,8,.2)}
+.tree .bark{fill:none;stroke:rgba(255,236,210,.22);stroke-width:3;stroke-linecap:round}
+.tree .groove{fill:none;stroke:rgba(50,26,10,.3);stroke-width:2;stroke-linecap:round}
+.tree .roots path{stroke:var(--t-wood);stroke-width:5;fill:none;stroke-linecap:round}
+.tree .branches path{fill:none;stroke:var(--t-wood);stroke-linecap:round}
+.tree .canopy .blob{transform-box:fill-box;transform-origin:center}
+.tree .canopy .deep{fill:var(--t-deep);opacity:.24}
+.tree .canopy .mid{fill:var(--t-mid);opacity:.32}
+.tree .canopy .light{fill:var(--t-light);opacity:.42}
+.tree .grass path{stroke:none}
+.tree .tuft.t0 path{fill:var(--t-grass-a)}
+.tree .tuft.t1 path{fill:var(--t-grass-b)}
+.tree .tuft.t2 path{fill:var(--t-grass-c)}
+.tree .flowers circle{fill:#fffaf0;stroke:#f1c84b;stroke-width:1.6}
 .tree .branches path.grow{stroke-dasharray:1;stroke-dashoffset:1;animation:grow 1.1s var(--ease) .25s forwards}
 @keyframes grow{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
 @keyframes trunkUp{from{transform:scaleY(.04)}to{transform:scaleY(1)}}
 @keyframes blossom{from{transform:scale(0);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes sway{0%,100%{transform:rotate(-.45deg)}50%{transform:rotate(.7deg)}}
-.tree.bloom .trunk,.tree.bloom .bark,.tree.bloom .groove{transform-box:fill-box;transform-origin:center bottom;animation:trunkUp .75s var(--ease) both;animation-delay:var(--bloom,0ms)}
+.tree.bloom .trunk,.tree.bloom .trunk-shade,.tree.bloom .bark,.tree.bloom .groove{transform-box:fill-box;transform-origin:center bottom;animation:trunkUp .75s var(--ease) both;animation-delay:var(--bloom,0ms)}
 .tree.bloom .branches path,.tree.bloom .branches path.grow{stroke-dasharray:1;animation:grow .55s var(--ease) both}
 .tree.bloom .leaf-bit{transform-box:fill-box;transform-origin:0% 50%;animation:blossom .5s var(--ease) backwards}
-.tree.bloom .grass path{transform-box:fill-box;transform-origin:center;animation:blossom .5s var(--ease) backwards}
-.tree.bloom .grass path{transform-origin:center bottom}
+.tree.bloom .grass .tuft{transform-box:fill-box;transform-origin:center bottom;animation:blossom .5s var(--ease) backwards}
+.tree.bloom .canopy .blob{animation:blossom .7s var(--ease) backwards}
 .tree.bloom .sway{transform-origin:400px 604px;animation:sway 4.4s ease-in-out calc(var(--bloom, 0ms) + 1.6s) infinite}
 .tree.acorn.bloom{transform-box:fill-box;transform-origin:center bottom;animation:blossom .8s var(--spring) both;animation-delay:var(--bloom,0ms)}
 @media (prefers-reduced-motion: reduce){
@@ -247,7 +260,8 @@ h3{font-size:17px;letter-spacing:-.02em;font-weight:600}
 .tree .bud:hover{transform:scale(1.35)}
 .tree .bud:hover circle{stroke:var(--ink);stroke-dasharray:none}
 .tree .fruit{cursor:pointer;outline:none;transform-box:fill-box;transform-origin:center;transition:transform .35s var(--spring)}
-.tree .fruit-bg{fill:#fff;stroke:#e3e3e8;stroke-width:1;filter:url(#fshadow);transition:fill .2s}
+.tree .fruit-shadow{fill:rgba(0,0,0,.09)}
+.tree .fruit-bg{fill:#fff;stroke:#e3e3e8;stroke-width:1;transition:fill .2s}
 .tree .fruit use{color:var(--ink);transition:color .2s}
 .tree .fruit .halo{fill:none;stroke:var(--ink);stroke-width:1.5;opacity:0;transform-box:fill-box;transform-origin:center}
 .tree .fruit:hover,.tree .fruit.hl,.tree .fruit:focus-visible{transform:scale(1.16)}
@@ -260,8 +274,8 @@ h3{font-size:17px;letter-spacing:-.02em;font-weight:600}
 @keyframes pop{from{transform:scale(0)}to{transform:scale(1)}}
 .tree.mini .fruit{cursor:default;pointer-events:none}
 .tree.mini .bud{pointer-events:none}
-.tip{position:absolute;left:0;top:0;transform:translate(-50%,calc(-100% - 14px)) scale(.94);opacity:0;pointer-events:none;background:rgba(29,29,31,.92);backdrop-filter:blur(10px);color:#fff;padding:9px 13px;border-radius:12px;font-size:12.5px;white-space:nowrap;transition:opacity .18s,transform .25s var(--ease);z-index:5;text-align:center}
-.tip.show{opacity:1;transform:translate(-50%,calc(-100% - 14px)) scale(1)}
+.tip{position:absolute;left:0;top:0;transform:translate(-50%,calc(-100% - 14px)) scale(.94);opacity:0;visibility:hidden;pointer-events:none;background:rgba(29,29,31,.95);color:#fff;padding:9px 13px;border-radius:12px;font-size:12.5px;white-space:nowrap;transition:opacity .18s,transform .25s var(--ease);z-index:5;text-align:center}
+.tip.show{opacity:1;visibility:visible;transform:translate(-50%,calc(-100% - 14px)) scale(1)}
 .tip b{display:block;font-size:13.5px;font-weight:600}
 .tip span{color:rgba(255,255,255,.65)}
 
@@ -485,31 +499,19 @@ footer{border-top:1px solid rgba(40,70,30,.08);background:rgba(243,246,239,.72);
 .emoji-field{width:64px;text-align:center;font-size:22px;padding:0}
 
 /* tree health */
-.tree .leaf{fill:#4f9d56;stroke:#2f6e38;stroke-width:.7}
-.tree .vein{fill:none;stroke:#2f6e38;stroke-width:1.1;stroke-linecap:round;opacity:.8}
-.tree .vein.side{stroke-width:.7;opacity:.55}
+.tree .leaf{fill:var(--t-leaf-a);stroke:var(--t-leaf-line);stroke-width:.7}
+.tree .leaf.v1{fill:var(--t-leaf-b)}
+.tree .leaf.v2{fill:var(--t-leaf-c)}
+.tree .vein{fill:none;stroke:var(--t-leaf-line);stroke-width:1.1;stroke-linecap:round;opacity:.6}
+.tree .vein.side{stroke-width:.7;opacity:.45}
 .tree .leaf-bit{transform-box:fill-box;transform-origin:0% 50%}
-.tree .fruit-leaf{fill:#3d8a45}
-.tree.tone-quiet .trunk{fill:#7a654c}
-.tree.tone-quiet .branches path,.tree.tone-quiet .roots path{stroke:#7a654c}
-.tree.tone-quiet .leaf{fill:#8b9468;stroke:#5c6844}
-.tree.tone-quiet .vein{stroke:#5c6844}
-.tree.tone-quiet .fruit-leaf,.tree.tone-quiet .grass path{stroke:#6d7a4e;fill:#6d7a4e}
-.tree.tone-quiet .grass path{fill:none}
-.tree.tone-wilting .trunk{fill:#6b5344}
-.tree.tone-wilting .branches path,.tree.tone-wilting .roots path{stroke:#6b5344}
-.tree.tone-wilting .bark{stroke:rgba(232,214,190,.32)}
-.tree.tone-wilting .leaf{fill:#8d6b52;stroke:#5c4332}
-.tree.tone-wilting .vein{stroke:#5c4332}
-.tree.tone-wilting .fruit-leaf,.tree.tone-wilting .grass path{stroke:#7a5c42;fill:#7a5c42}
-.tree.tone-wilting .grass path{fill:none}
-.tree.tone-dormant .trunk{fill:#8a8178}
-.tree.tone-dormant .branches path,.tree.tone-dormant .roots path{stroke:#8a8178}
-.tree.tone-dormant .bark{stroke:rgba(255,255,255,.25)}
-.tree.tone-dormant .leaf{fill:#a3988c;stroke:#6e655c}
-.tree.tone-dormant .vein{stroke:#6e655c}
-.tree.tone-dormant .fruit-leaf,.tree.tone-dormant .grass path{stroke:#8d847a;fill:#8d847a}
-.tree.tone-dormant .grass path{fill:none}
+.tree .fruit-leaf{fill:var(--t-leaf-b)}
+.tree.tone-quiet{--t-wood:#7d6249;--t-leaf-a:#8d9a62;--t-leaf-b:#77864f;--t-leaf-c:#a3ad74;--t-leaf-line:#5c6844;--t-deep:#7d8a56;--t-mid:#a2ab74;--t-light:#c3c89a;--t-grass-a:#8a9a5c;--t-grass-b:#6f7f48;--t-grass-c:#a3ad74;--t-ground:#d2d6ae}
+.tree.tone-wilting{--t-wood:#6b5344;--t-leaf-a:#a87c4f;--t-leaf-b:#8d6440;--t-leaf-c:#c49a5c;--t-leaf-line:#5c4332;--t-deep:#9a7650;--t-mid:#c09a68;--t-light:#dcc191;--t-grass-a:#a08a58;--t-grass-b:#837044;--t-grass-c:#bba46e;--t-ground:#ddd2b0}
+.tree.tone-wilting .bark{stroke:rgba(232,214,190,.2)}
+.tree.tone-dormant{--t-wood:#857a70;--t-leaf-a:#a3988c;--t-leaf-b:#8d8378;--t-leaf-c:#b8afa4;--t-leaf-line:#6e655c;--t-grass-a:#9c968a;--t-grass-b:#837d72;--t-grass-c:#b3ad9f;--t-ground:#dcd8cf}
+.tree.tone-dormant .bark{stroke:rgba(255,255,255,.18)}
+.tree.tone-dormant .flowers{display:none}
 @keyframes leafIn{from{transform:scale(0)}to{transform:scale(1)}}
 .tree .fruit-emoji{font-size:24px;dominant-baseline:central;text-anchor:middle;pointer-events:none}
 .tree .acorn path,.tree .acorn ellipse{stroke:none}
