@@ -30,7 +30,7 @@ export function LeaderboardPage() {
       <div className="page-head">
         <div>
           <div className="eyebrow">A little friendly competition</div>
-          <h1>Big memories. Local legends.</h1>
+          <h1>Big hangouts. Local legends.</h1>
           <p className="sub">The groups making the most of their city, one side quest at a time.</p>
         </div>
       </div>
@@ -59,7 +59,7 @@ export function LeaderboardPage() {
             <div className="brow head">
               <span>Rank</span>
               <span>Group</span>
-              <span className="n">Outings</span>
+              <span className="n">Hangouts</span>
               <span className="p">Points</span>
             </div>
             {rows.length === 0 && <p className="muted pad">No groups here yet.</p>}
@@ -95,7 +95,7 @@ export function LeaderboardPage() {
                         ? `${fmtN(rows[fr.rank - 2].pts - fr.pts)} points from #${fr.rank - 1}.`
                         : `${fmtN(third.pts - fr.pts)} points from the top three.`}
                   </b>
-                  <p>{fr.rank <= 3 ? "Keep the streak going." : "Your next outing could shake things up."}</p>
+                  <p>{fr.rank <= 3 ? "Keep the streak going." : "Your next hangout could shake things up."}</p>
                 </div>
                 {mineIn.length > 1 && (
                   <select className="field" value={fr.id} onChange={(e) => setFocus(e.target.value)}>
@@ -146,7 +146,7 @@ export function LeaderboardPage() {
                 <span>Holidays add +20. Streaks add bonus points; long quiet stretches decay them.</span>
               </div>
               <button className="btn btn-primary block mt" onClick={() => go("log")}>
-                Log an outing <Icon name="arrow" />
+                Log a hangout <Icon name="arrow" />
               </button>
             </section>
           </aside>

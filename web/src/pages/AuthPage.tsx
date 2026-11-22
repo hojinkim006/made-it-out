@@ -14,21 +14,46 @@ export function AuthPage() {
   // A sample tree for the welcome card. Real data needs an account.
   const sample = useMemo(() => {
     const s = seed();
-    return s.logs.filter((l) => l.groupId === s.groups[0]?.id);
+    return s.logs
+      .filter((l) => l.groupId === s.groups[0]?.id)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-6);
   }, []);
 
   return (
-    <div className="auth">
-      <section className="card auth-hero">
-        <div className="eyebrow">Less group chat. More good stories.</div>
-        <h1>made it out.</h1>
-        <p className="sub">Plan hangouts in one place, log what you did, and watch your group's tree grow.</p>
-        <div className="gprev">
-          <Tree logs={sample} stage="Full canopy" health={groupHealth(sample.map((l) => l.date))} mini />
+    <div className="welcome">
+      <header className="welcome-bar">
+        <span className="logo" aria-label="made it out.">
+          <span className="logo-mark">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 21v-9M12 12l-4-4M12 14l4-4M12 9V4" />
+            </svg>
+          </span>
+          <span>made it out.</span>
+        </span>
+        <div className="welcome-nav">
+          <button className={`btn sm ${mode === "login" ? "btn-primary" : "btn-secondary"}`} onClick={() => setMode("login")}>
+            Log in
+          </button>
+          <button className={`btn sm ${mode === "signup" ? "btn-primary" : "btn-secondary"}`} onClick={() => setMode("signup")}>
+            Sign up
+          </button>
         </div>
-      </section>
-      <section className="card pad-lg form">
-        <div style={{ marginBottom: 22 }}>
+      </header>
+      <div className="welcome-main">
+        <section className="welcome-copy">
+          <h1>Get out. Grow a tree.</h1>
+          <p className="welcome-lead">Each group is a tree. Plan a hangout, log it, and the tree shows how you're doing.</p>
+          <ul className="welcome-points">
+            <li>Plan the next hangout in one place.</li>
+            <li>Log it when you actually go.</li>
+            <li>The tree grows when the group keeps showing up.</li>
+          </ul>
+          <div className="welcome-tree" aria-hidden="true">
+            <Tree logs={sample} stage="Young tree" health={groupHealth(sample.map((l) => l.date))} mini />
+          </div>
+        </section>
+        <section className="card welcome-card">
           <Seg
             value={mode}
             onChange={setMode}
@@ -37,9 +62,9 @@ export function AuthPage() {
               { key: "signup", label: "Sign up" },
             ]}
           />
-        </div>
-        {mode === "login" ? <Login /> : <SignUp onDone={() => setMode("login")} />}
-      </section>
+          {mode === "login" ? <Login /> : <SignUp onDone={() => setMode("login")} />}
+        </section>
+      </div>
     </div>
   );
 }
