@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { ActivityLog } from "../lib/types";
-import { catInfo, STAGE_SCALE, type Health, type Stage } from "../lib/scoring";
+import { catInfo, type Health, type Stage } from "../lib/scoring";
 import { fmtD } from "../lib/dates";
 
 // Each slot is one branch + one fruit. Oldest memories fill the lowest, strongest branches first.
@@ -31,8 +31,20 @@ const SLOTS: { d: string; n: [number, number]; w: number }[] = [
   { d: "M400 110 Q400 80 400 46", n: [400, 46], w: 2.6 },
 ];
 export const MAX_FRUIT = SLOTS.length;
-const MILESTONES = [5, 10, 15, 20, 24];
-export const nextMilestone = (n: number) => MILESTONES.find((m) => m > n) ?? 24;
+/** Draw size of hangout icons and leaves, relative to the original artwork. */
+const FRUIT_SIZE = 1.2;
+const LEAF_SIZE = 1.15;
+/** Smallest a tree with branches is drawn, as a share of full size. */
+const MIN_SIZE = 0.55;
+
+/**
+ * How big the tree is drawn for a number of hangouts. Each one makes it bigger,
+ * fastest early on, until every branch is filled. No empty branches are shown.
+ */
+export function growthScale(n: number) {
+  const filled = Math.min(Math.max(n, 0), MAX_FRUIT) / MAX_FRUIT;
+  return MIN_SIZE + (1 - MIN_SIZE) * Math.sqrt(filled);
+}
 
 /** How much the trunk thickens and the whole tree reaches, by how often the group gets out. */
 const GIRTH: Record<Health["status"], number> = {
@@ -96,15 +108,13 @@ interface Props {
   grow?: number | null;
   highlight?: number | null;
   onFruit?: (i: number) => void;
-  onBud?: () => void;
 }
 
-export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFruit = true, grow, highlight, onFruit, onBud }: Props) {
+export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFruit = true, grow, highlight, onFruit }: Props) {
   const wrap = useRef<HTMLDivElement>(null);
   const [tip, setTip] = useState<{ x: number; y: number; i: number } | null>(null);
   const n = Math.min(logs.length, SLOTS.length);
-  const ms = nextMilestone(logs.length);
-  const scale = STAGE_SCALE[stage] * health.shrink * REACH[health.status];
+  const scale = growthScale(n) * health.shrink * REACH[health.status];
   const girth = GIRTH[health.status];
   const leaves = leafSpots(health.leaves, n);
   const fans = SLOTS.slice(0, n).flatMap((s, i) => fanAt(s.n[0], s.n[1], FAN[health.status], i).map((leaf, k) => ({ ...leaf, key: `${i}-${k}`, delay: 760 + i * 36 + k * 24 })));
@@ -144,11 +154,6 @@ export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFrui
         </g>
         <g style={{ transform: `scale(${scale})`, transformOrigin: "400px 604px" }}>
           <g className="sway">
-          <g className="future">
-            {SLOTS.slice(n, ms).map((s, i) => (
-              <path key={i} d={s.d} />
-            ))}
-          </g>
           <g className="branches">
             {SLOTS.slice(0, n).map((s, i) => {
               const side = i % 2 ? -1 : 1;
@@ -177,7 +182,7 @@ export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFrui
           </g>
           <g className="leaves">
             {fans.map((l) => (
-              <g key={l.key} transform={`translate(${l.x} ${l.y}) rotate(${l.rot})`}>
+              <g key={l.key} transform={`translate(${l.x} ${l.y}) rotate(${l.rot}) scale(${LEAF_SIZE})`}>
                 <g className="leaf-bit" style={wait(l.delay)}>
                   <path className="leaf" d="M0 0 C14 -9 32 -7 42 0 C32 7 14 9 0 0 Z" />
                   <path className="vein" d="M3 0 H30" />
@@ -187,19 +192,10 @@ export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFrui
               </g>
             ))}
             {leaves.map((l, k) => (
-              <g key={`s${k}`} transform={`translate(${l.x} ${l.y}) rotate(${l.rot})`}>
+              <g key={`s${k}`} transform={`translate(${l.x} ${l.y}) rotate(${l.rot}) scale(${LEAF_SIZE})`}>
                 <g className="leaf-bit" style={wait(820 + k * 28)}>
                   <path className="leaf" d={k % 3 === 0 ? "M0 0 C16 -10 36 -8 46 0 C36 8 16 10 0 0 Z" : "M0 0 C12 -7 26 -5 34 0 C26 5 12 7 0 0 Z"} />
                   <path className="vein" d={k % 3 === 0 ? "M3 0 H32" : "M3 0 H24"} />
-                </g>
-              </g>
-            ))}
-          </g>
-          <g className="buds">
-            {SLOTS.slice(n, ms).map((s, i) => (
-              <g key={i} transform={`translate(${s.n[0]} ${s.n[1]})`}>
-                <g className="bud" role={mini ? undefined : "button"} aria-label={mini ? undefined : "Empty branch"} onClick={onBud}>
-                  <circle r="9" />
                 </g>
               </g>
             ))}
@@ -209,7 +205,7 @@ export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFrui
               const log = logs[i];
               const cls = ["fruit", grow === i ? "pop" : "", i === n - 1 ? "latest" : "", highlight === i ? "hl" : ""].join(" ");
               return (
-                <g key={log.id} transform={`translate(${s.n[0]} ${s.n[1]})`}>
+                <g key={log.id} data-log={log.id} transform={`translate(${s.n[0]} ${s.n[1]}) scale(${FRUIT_SIZE})`}>
                   <g
                     className={cls}
                     style={wait(980 + i * 70)}

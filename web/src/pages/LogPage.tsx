@@ -236,7 +236,9 @@ export function LogPage() {
                   }
                 }}
               />
-              This is our plan: <b>{g.plan.title}</b> {g.plan.confirmedOptionId ? "(confirmed, earns speed points)" : "(not confirmed yet)"}
+              <span>
+                This is our plan: <b>{g.plan.title}</b> {g.plan.confirmedOptionId ? "(confirmed, earns speed points)" : "(not confirmed yet)"}
+              </span>
             </label>
           )}
           <label className="f">

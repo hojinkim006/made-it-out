@@ -261,14 +261,6 @@ export function stageFor(ageDays: number): Stage {
   return "Full canopy";
 }
 
-export const STAGE_SCALE: Record<Stage, number> = {
-  Acorn: 0.45,
-  Sprout: 0.62,
-  Sapling: 0.78,
-  "Young tree": 0.9,
-  "Full canopy": 1,
-};
-
 /** Days until the next stage, or null at full size. */
 export function nextStageIn(ageDays: number): { stage: Stage; days: number } | null {
   const marks: [number, Stage][] = [

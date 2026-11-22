@@ -13,7 +13,7 @@ function icon(p: Pin, showAll: boolean) {
   const faded = !p.mine;
   return L.divIcon({
     className: "",
-    html: `<span class="map-leaf${faded ? " faded" : ""}${!p.exact ? " approx" : ""}" style="${faded && !showAll ? "display:none" : ""}"><i>${esc(p.log.emoji || catInfo(p.log.cat).emoji)}</i></span>`,
+    html: `<span data-log="${esc(p.log.id)}" class="map-leaf${faded ? " faded" : ""}${!p.exact ? " approx" : ""}" style="${faded && !showAll ? "display:none" : ""}"><i>${esc(p.log.emoji || catInfo(p.log.cat).emoji)}</i></span>`,
     iconSize: [34, 34],
     iconAnchor: [17, 30],
     popupAnchor: [0, -28],
@@ -25,21 +25,26 @@ interface Props {
   /** Also show events the viewer missed, faded. */
   showAll: boolean;
   onOpen: (logId: string) => void;
+  /** Called each time the pins are placed and the view has settled. */
+  onReady?: () => void;
 }
 
 /** Event leaves on a map of Boston. Uses Leaflet directly; loaded lazily from the group page. */
-export default function LeafMap({ pins, showAll, onOpen }: Props) {
+export default function LeafMap({ pins, showAll, onOpen, onReady }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const map = useRef<L.Map | null>(null);
   const layer = useRef<L.LayerGroup | null>(null);
   const open = useRef(onOpen);
+  const ready = useRef(onReady);
   useEffect(() => {
     open.current = onOpen;
-  }, [onOpen]);
+    ready.current = onReady;
+  }, [onOpen, onReady]);
 
   useEffect(() => {
     if (!el.current) return;
-    const m = L.map(el.current, { zoomControl: true, scrollWheelZoom: false }).setView(BOSTON, 12);
+    // On touch screens a one-finger swipe should scroll the page, not trap it in the map.
+    const m = L.map(el.current, { zoomControl: true, scrollWheelZoom: false, dragging: !L.Browser.mobile }).setView(BOSTON, 12);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
@@ -77,8 +82,11 @@ export default function LeafMap({ pins, showAll, onOpen }: Props) {
         })
         .addTo(g);
     }
-    if (shown.length) m.fitBounds(L.latLngBounds(shown.map((p) => [p.lat, p.lon] as L.LatLngTuple)).pad(0.25), { maxZoom: 14 });
-    else m.setView(BOSTON, 12);
+    // No pan/zoom animation: the tree-to-map flight needs pins at their final spots right away.
+    if (shown.length) m.fitBounds(L.latLngBounds(shown.map((p) => [p.lat, p.lon] as L.LatLngTuple)).pad(0.25), { maxZoom: 14, animate: false });
+    else m.setView(BOSTON, 12, { animate: false });
+    const raf = requestAnimationFrame(() => ready.current?.());
+    return () => cancelAnimationFrame(raf);
   }, [pins, showAll]);
 
   return <div ref={el} className="leaf-map" role="region" aria-label="Map of hangouts" />;

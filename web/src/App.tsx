@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStore } from "./store";
 import { NavCtx, type Route, type View } from "./nav";
 import { Icon, SvgDefs } from "./components/Icons";
-import { Seg } from "./components/Sheet";
+import { Seg, Sheet } from "./components/Sheet";
+import { TabBar } from "./components/TabBar";
 import { AuthPage } from "./pages/AuthPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { GroupPage } from "./pages/GroupPage";
@@ -16,17 +17,41 @@ export default function App() {
   const { me, status, error, reload, toasts, signOut, recovery, endRecovery } = useStore();
   const [route, setRoute] = useState<Route>({ view: "profile" });
   const [menu, setMenu] = useState(false);
-  const [sheet, setSheet] = useState<"settings" | "edit" | null>(null);
+  const [sheet, setSheet] = useState<"settings" | "edit" | "account" | null>(null);
   const [animKey, setAnimKey] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  const routeRef = useRef(route);
+  useEffect(() => {
+    routeRef.current = route;
+  }, [route]);
+
   const go = useCallback((view: View, opts: Omit<Route, "view"> = {}) => {
-    setRoute((r) => ({ view, groupId: opts.groupId ?? r.groupId, tab: opts.tab ?? (view === "group" ? "overview" : r.tab), grow: opts.grow ?? null, prefill: opts.prefill }));
+    const r = routeRef.current;
+    const next: Route = { view, groupId: opts.groupId ?? r.groupId, tab: opts.tab ?? (view === "group" ? "overview" : r.tab), grow: opts.grow ?? null, prefill: opts.prefill };
+    // Each page change is a history entry, so the phone's back gesture steps back through the app.
+    history.pushState({ route: next }, "");
+    setRoute(next);
     setAnimKey((k) => k + 1);
     setMenu(false);
+    setSheet(null);
     window.scrollTo({ top: 0 });
   }, []);
   const nav = useMemo(() => ({ route, go }), [route, go]);
+
+  useEffect(() => {
+    history.replaceState({ route: routeRef.current }, "");
+    const onPop = (e: PopStateEvent) => {
+      const r = (e.state as { route?: Route } | null)?.route;
+      setRoute(r ? { ...r, grow: null } : { view: "profile" });
+      setAnimKey((k) => k + 1);
+      setMenu(false);
+      setSheet(null);
+      window.scrollTo({ top: 0 });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   useEffect(() => {
     if (!menu) return;
@@ -36,6 +61,23 @@ export default function App() {
   }, [menu]);
 
   const tab = route.view === "leaderboard" ? "leaderboard" : "profile";
+  const showWelcome = supabaseConfigured && status === "ready" && !me;
+
+  if (showWelcome) {
+    return (
+      <NavCtx.Provider value={nav}>
+        <SvgDefs />
+        <AuthPage />
+        <div className="toasts" aria-live="polite">
+          {toasts.map((t) => (
+            <div className="toast" key={t.id}>
+              <Icon name="spark" /> {t.text}
+            </div>
+          ))}
+        </div>
+      </NavCtx.Provider>
+    );
+  }
 
   return (
     <NavCtx.Provider value={nav}>
@@ -166,6 +208,31 @@ export default function App() {
       {/* A password-reset link signs you in; Settings opens to set a new password. */}
       {me && (sheet === "settings" || recovery) && <SettingsSheet onClose={() => (setSheet(null), endRecovery())} />}
       {me && sheet === "edit" && <EditProfileSheet onClose={() => setSheet(null)} />}
+      {me && sheet === "account" && (
+        <Sheet onClose={() => setSheet(null)}>
+          <div className="account-head">
+            <span className="av">{me.displayName[0]}</span>
+            <div>
+              <h2>{me.displayName}</h2>
+              <p className="meta">
+                @{me.username} · {me.region}
+              </p>
+            </div>
+          </div>
+          <div className="account-list">
+            <button onClick={() => setSheet("edit")}>
+              <Icon name="edit" /> Edit profile <span className="chev"><Icon name="chevR" /></span>
+            </button>
+            <button onClick={() => setSheet("settings")}>
+              <Icon name="gear" /> Settings <span className="chev"><Icon name="chevR" /></span>
+            </button>
+            <button onClick={() => (void signOut(), setSheet(null))}>
+              <Icon name="out" /> Sign out
+            </button>
+          </div>
+        </Sheet>
+      )}
+      {me && supabaseConfigured && status === "ready" && <TabBar onMe={() => setSheet("account")} />}
     </NavCtx.Provider>
   );
 }
