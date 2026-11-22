@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useStore, uid } from "../store";
 import { useNav } from "../nav";
 import { Sheet } from "./Sheet";
@@ -151,8 +151,13 @@ export function InviteSheet({ groupId, onClose }: { groupId: string; onClose: ()
 export function LogSheet({ logs, index, onClose, onNav }: { logs: ActivityLog[]; index: number; onClose: () => void; onNav: (i: number) => void }) {
   const { state, nameOf, me, update, toast } = useStore();
   const [draft, setDraft] = useState("");
+  // Clear the comment box when switching to another log (reset during render, not in an effect).
+  const [draftIndex, setDraftIndex] = useState(index);
+  if (draftIndex !== index) {
+    setDraftIndex(index);
+    setDraft("");
+  }
   const l = logs[index];
-  useEffect(() => setDraft(""), [index]);
   if (!l) return null;
   const g = state.groups.find((x) => x.id === l.groupId);
   const p = l.points;

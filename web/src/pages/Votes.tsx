@@ -56,6 +56,7 @@ function useNow(ms = 15000) {
 export function NextUp({ g }: { g: Group }) {
   const { me, update, nameOf, toast } = useStore();
   const { go } = useNav();
+  const now = useNow();
   const p = g.plan;
   if (!p)
     return (
@@ -83,7 +84,7 @@ export function NextUp({ g }: { g: Group }) {
   const waiting = waitingIds(g.memberIds, p).length;
   const rec = recommended(n, p);
   const people = p.confirmedOptionId ? p.goingIds : comingTo(o);
-  const left = deadlineOf(p) - Date.now();
+  const left = deadlineOf(p) - now;
   const hostCalls = needsHost(p);
 
   const accept = () => {
