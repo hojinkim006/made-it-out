@@ -35,7 +35,7 @@ export default function App() {
     return () => document.removeEventListener("mousedown", close);
   }, [menu]);
 
-  const tab = route.view === "plan" || route.view === "log" ? "group" : route.view;
+  const tab = route.view === "leaderboard" ? "leaderboard" : "profile";
 
   return (
     <NavCtx.Provider value={nav}>
@@ -54,11 +54,10 @@ export default function App() {
             {me && (
               <Seg
                 id="navSeg"
-                value={tab as "profile" | "group" | "leaderboard"}
+                value={tab}
                 onChange={(k) => go(k)}
                 options={[
                   { key: "profile", label: <><span className="yr">Your </span>profile</> },
-                  { key: "group", label: <><span className="yr">Your </span>groups</> },
                   { key: "leaderboard", label: "Leaderboard" },
                 ]}
               />
@@ -150,7 +149,6 @@ export default function App() {
 
       <footer>
         <div className="foot">
-          <span>Less group chat. More good stories.</span>
           <span>
             Places © OpenStreetMap contributors · Boston
           </span>
