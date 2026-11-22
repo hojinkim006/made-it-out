@@ -2,17 +2,13 @@ import { useState } from "react";
 import { useStore } from "../store";
 import { useNav } from "../nav";
 import { Avatar, CatIcon, Icon } from "../components/Icons";
-import { Tree } from "../components/Tree";
+import { Grove } from "../components/Grove";
 import { LogSheet, NewGroupSheet } from "../components/GroupSheets";
 import { findUser } from "../lib/auth";
-import { boardRows, isDuo } from "../lib/scoring";
 import { fmtD, fmtT, MON, parseD } from "../lib/dates";
-import { groupInfo, myPoints } from "../lib/groupInfo";
+import { groupInfo } from "../lib/groupInfo";
 import { activeOption, comingTo, responded, waitingIds } from "../lib/plans";
 import type { Group, Plan } from "../lib/types";
-import { COMPETITORS } from "../data/seed";
-
-const fmtN = (n: number) => n.toLocaleString("en-US");
 
 export function ProfilePage() {
   const { me, state, myGroups } = useStore();
@@ -21,7 +17,6 @@ export function ProfilePage() {
   const [open, setOpen] = useState<{ logs: typeof state.logs; i: number } | null>(null);
   const u = me!;
 
-  const myLogs = state.logs.filter((l) => l.attendeeIds.includes(u.id));
   const recent = state.logs
     .filter((l) => myGroups.some((g) => g.id === l.groupId))
     .sort((a, b) => b.date.localeCompare(a.date))
@@ -33,103 +28,29 @@ export function ProfilePage() {
     plans.find(({ p }) => !responded(p, u.id)) ??
     [...plans].sort((a, b) => (activeOption(a.g.memberIds.length, a.p)?.date ?? "").localeCompare(activeOption(b.g.memberIds.length, b.p)?.date ?? ""))[0];
 
-  const rankIn = (gid: string, duo: boolean) => {
-    const rows = duo
-      ? boardRows("duos", state.groups, state.logs, COMPETITORS.duos, {})
-      : boardRows("local", state.groups, state.logs, COMPETITORS.local, { region: u.region });
-    return rows.find((r) => r.id === gid)?.rank;
-  };
+  const users = Object.fromEntries(state.users.map((person) => [person.id, person.displayName]));
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <div className="eyebrow">Your little corner</div>
-          <h1>Good to see you, {u.displayName}.</h1>
-          <p className="sub">Good friends. New places. More reasons to get out.</p>
-        </div>
-        <button className="btn btn-primary" onClick={() => setSheet("new")}>
-          <Icon name="plus" /> Create a group
-        </button>
-      </div>
+      <Grove
+        onOpen={(id) => go("group", { groupId: id })}
+        onPlant={() => setSheet("new")}
+        trees={myGroups.map((g) => {
+          const info = groupInfo(state, g);
+          return {
+            group: g,
+            stage: info.stage,
+            health: info.score.health,
+            logs: info.logs,
+            friends: g.memberIds.filter((id) => id !== u.id).map((id) => ({ id, name: users[id] ?? "Friend" })),
+          };
+        })}
+      />
       <div className="grid-side">
-        <div className="stack">
-          <div className="stats3">
-            <div className="card stat">
-              <div className="num">{myLogs.length}</div>
-              <div className="lbl">Hangouts made it out to</div>
-            </div>
-            <div className="card stat">
-              <div className="num">{myGroups.length}</div>
-              <div className="lbl">Groups growing</div>
-            </div>
-            <div className="card stat">
-              <div className="num">{fmtN(myPoints(state.logs, u.id))}</div>
-              <div className="lbl">Points from your logs</div>
-            </div>
-          </div>
-          <div className="sec-head">
-            <div>
-              <h2>Your groups</h2>
-              <p className="muted">A little adventure looks good on you.</p>
-            </div>
-            {myGroups[0] && (
-              <button className="link" onClick={() => go("group", { groupId: myGroups[0].id })}>
-                View all groups <Icon name="arrow" />
-              </button>
-            )}
-          </div>
-          <div className="gcards">
-            {myGroups.map((g) => {
-              const info = groupInfo(state, g);
-              const duo = isDuo(g);
-              return (
-                <article
-                  key={g.id}
-                  className="card gcard hoverable"
-                  tabIndex={0}
-                  onClick={() => go("group", { groupId: g.id })}
-                  onKeyDown={(e) => e.key === "Enter" && go("group", { groupId: g.id })}
-                >
-                  <div className="gprev">
-                    <Tree logs={info.logs} stage={info.stage} health={info.score.health} mini />
-                  </div>
-                  <div className="gbody">
-                    <h3>{g.name}</h3>
-                    <p className="muted">
-                      {g.memberIds.length} friends · {g.hood} · {info.stage}
-                    </p>
-                    <p className="muted">
-                      {info.logs.length} {info.logs.length === 1 ? "adventure" : "adventures"} · {info.score.health.status}
-                    </p>
-                  </div>
-                  <div className="gfoot">
-                    <span>
-                      <b>{fmtN(info.score.total)}</b> pts
-                    </span>
-                    <span className="muted">
-                      #{rankIn(g.id, duo)} {duo ? "in Duos" : `in ${u.region.split(",")[0]}`} <Icon name="chevR" />
-                    </span>
-                  </div>
-                </article>
-              );
-            })}
-            <button className="card gcard add" onClick={() => setSheet("new")}>
-              <span className="plus">
-                <Icon name="plus" />
-              </span>
-              Start a new group
-            </button>
-          </div>
-        </div>
+        <Friends />
         <aside className="stack">
           <section className="card horizon">
-            <div className="eyebrow">{up && !responded(up.p, u.id) ? "Needs your vote" : "On the horizon"}</div>
-            <h2>
-              Something to look
-              <br />
-              forward to.
-            </h2>
+            <h2>Coming up</h2>
             {up ? (
               <Horizon plan={up} meId={u.id} />
             ) : (
@@ -143,12 +64,10 @@ export function ProfilePage() {
               </div>
             )}
           </section>
-          <Friends />
           <section className="card pad">
             <div className="card-head">
               <div>
-                <h2>Fresh memories</h2>
-                <p className="muted">The latest fruit on your trees.</p>
+                <h2>Recent hangouts</h2>
               </div>
             </div>
             <div className="mini-list">
@@ -208,7 +127,6 @@ function Friends() {
       <div className="card-head">
         <div>
           <h2>Friends</h2>
-          <p className="muted">You're @{me!.username}. Add friends by username.</p>
         </div>
       </div>
       <form

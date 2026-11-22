@@ -194,8 +194,8 @@ export function LogPage() {
       </button>
       <div className="page-head">
         <div>
-          <h1>One for the memory tree.</h1>
-          <p className="sub">Log a real outing, earn your points, and watch your group grow.</p>
+          <h1>One more hangout on the tree.</h1>
+          <p className="sub">Log where you went, earn your points, and watch your group grow.</p>
         </div>
       </div>
       <div className="grid-side">
@@ -306,7 +306,7 @@ export function LogPage() {
             <Stars value={myRate} onRate={setMyRate} />
           </div>
           <div className="f">
-            <span>Pick a memory for your tree</span>
+            <span>Pick a look for this hangout</span>
             <div className="cats">
               {(Object.keys(CATS) as Cat[]).map((k) => (
                 <button
@@ -414,7 +414,7 @@ export function LogPage() {
               Everyone in {g.name} sees it right away.
             </p>
             <button className="btn btn-primary block" onClick={save}>
-              Save activity <Icon name="arrow" />
+              Save hangout <Icon name="arrow" />
             </button>
           </section>
         </aside>

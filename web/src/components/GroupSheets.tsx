@@ -179,7 +179,7 @@ export function LogSheet({ logs, index, onClose, onNav }: { logs: ActivityLog[];
           {l.emoji}
         </span>
         <div className="eyebrow" style={{ margin: 0 }}>
-          Memory {index + 1} of {logs.length} · {CATS[l.cat].label}
+          Hangout {index + 1} of {logs.length} · {CATS[l.cat].label}
         </div>
         <h2>{l.title}</h2>
         <p className="meta">{fmtD(l.date, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>

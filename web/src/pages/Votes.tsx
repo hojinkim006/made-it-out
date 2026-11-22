@@ -132,7 +132,7 @@ export function NextUp({ g }: { g: Group }) {
         {p.confirmedOptionId ? (
           p.goingIds.includes(me!.id) ? (
             <button className="btn btn-primary sm" onClick={() => go("log", { groupId: g.id })}>
-              Log it <Icon name="arrow" />
+              Log hangout <Icon name="arrow" />
             </button>
           ) : (
             <button
@@ -656,7 +656,7 @@ function Confirmed({ g, p, onSuggest, onHandoff }: { g: Group; p: Plan; onSugges
         {p.goingIds.includes(me!.id) ? (
           <>
             <button className="btn btn-primary sm" onClick={() => go("log", { groupId: g.id })}>
-              Log it <Icon name="arrow" />
+              Log hangout <Icon name="arrow" />
             </button>
             <button
               className="btn btn-secondary sm"
