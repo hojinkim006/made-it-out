@@ -105,8 +105,14 @@ export default function App() {
             <section className="card pad-lg">
               <h2>Almost there.</h2>
               <p className="sub">
-                Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to <code>web/.env.local</code>, then restart{" "}
-                <code>npm run dev</code>.
+                The app can't find its Supabase settings: <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code>.
+              </p>
+              <p className="sub">
+                <b>On Netlify:</b> add both under Site configuration → Environment variables, then Deploys → Trigger deploy. They're read
+                when the site is built, so the deploy has to run after adding them.
+              </p>
+              <p className="sub">
+                <b>On your computer:</b> add both to <code>web/.env.local</code>, then restart <code>npm run dev</code>.
               </p>
             </section>
           ) : status === "loading" ? (
