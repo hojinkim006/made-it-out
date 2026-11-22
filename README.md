@@ -2,10 +2,24 @@
 
 Plan hangouts with friends without the group chat. A group posts a plan, members vote on times, and every outing they log grows the group's tree. Trying rare activities and deciding quickly earns points on local leaderboards.
 
+Built for Boston: places, events, scoring and leaderboards all use Boston-area data.
+
 | | |
 |---|---|
 | Live app | https://made-it-out.netlify.app/ |
 | Supabase dashboard (team members) | https://supabase.com/dashboard/project/vmvggjcyjfklirgfgyfu |
+
+## Built for Boston
+
+made it out is designed for friend groups in the Boston area. Its data, scoring and leaderboards are local to the city.
+
+- **Real Boston places.** About 4,700 restaurants, cafes and activities (bowling, climbing, escape rooms, museums and more) from OpenStreetMap, covering Boston, Cambridge, Somerville and Brookline. Each is labeled with one of 27 neighborhoods, from Allston to Jamaica Plain.
+- **City events.** About 300 recent and upcoming events from the City of Boston open data portal, suggested under "Try something new".
+- **Rarity measured against Boston.** A place's Rarity combines how uncommon its type is nationally (Yelp) with how uncommon it is in Boston (OpenStreetMap). A spot that's rare in Boston scores higher than one on every corner.
+- **Local leaderboards.** Groups compete within their city (Boston, Cambridge, Somerville, Brookline), and students compete on school boards for Boston-area universities: Boston University, MIT, Harvard, Northeastern, Tufts, Boston College, Emerson and Suffolk.
+- **Boston prices.** Gemini estimates what a plan costs using typical Boston prices.
+
+The region list also includes New York and Providence, but place and event data currently cover the Boston area only. Data sources and licensing are in [docs/DATA.md](docs/DATA.md).
 
 ## Features
 
@@ -14,7 +28,7 @@ Plan hangouts with friends without the group chat. A group posts a plan, members
 - **Plans and voting.** Any member proposes one or more times, and everyone answers each one (yes, partly, if needed, no). The host confirms a time, or it confirms itself when voting closes.
 - **Activity logs.** Place, date, attendees, description, photos and videos, labels, ratings and comments.
 - **Scoring.** Rarity, turnout, decision speed, the First Bloom bonus and holidays, plus streaks and decay. See [docs/SCORING.md](docs/SCORING.md).
-- **Boston data.** Real places from OpenStreetMap and City of Boston events, scored for rarity with Yelp and OpenStreetMap counts. See [docs/DATA.md](docs/DATA.md).
+- **Boston places and events.** Log real places and city events; see [Built for Boston](#built-for-boston).
 - **Cost estimates.** While a plan is typed, Gemini estimates the cost per person and adds a tag such as `#dinner`. If Gemini is unavailable, a built-in price list is used instead.
 
 ## Architecture
@@ -92,11 +106,11 @@ cd pipeline && ruff check . && pytest
 
 | Change | How it ships |
 |---|---|
-| App code (`web/`) | Merge into `main`. Netlify deploys to https://madeitout.netlify.app/; every pull request also gets a preview link. |
+| App code (`web/`) | Merge into `main`. Netlify deploys to https://made-it-out.netlify.app/; every pull request also gets a preview link. |
 | Database (`supabase/migrations/`) | Add a new migration file, then run it once in the Supabase SQL Editor. Migrations run in filename order. |
 | Edge Function (`supabase/functions/plan-insight/`) | Paste the updated file into Supabase under Edge Functions, `plan-insight`, and deploy. |
 
-Supabase Auth URL settings (Authentication, URL Configuration): the Site URL is `https://madeitout.netlify.app`, and `http://localhost:5173` is listed under Redirect URLs for local development.
+Supabase Auth URL settings (Authentication, URL Configuration): the Site URL is `https://made-it-out.netlify.app`, and `http://localhost:5173` is listed under Redirect URLs for local development.
 
 ### Setting up a new Supabase project
 
