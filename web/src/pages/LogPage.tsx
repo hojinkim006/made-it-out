@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useStore, uid } from "../store";
 import { useNav } from "../nav";
 import { CatIcon, Icon } from "../components/Icons";
-import { NicheTag, PlaceSearch } from "../components/PlaceSearch";
-import { nichePercentile, spotById, usePlaceData, type Spot } from "../lib/places";
+import { RarityTag, PlaceSearch } from "../components/PlaceSearch";
+import { rarityPercentile, spotById, usePlaceData, type Spot } from "../lib/places";
 import { MAX_FRUIT } from "../components/Tree";
 import { CATS, normLabel, scoreLog } from "../lib/scoring";
 import { todayISO } from "../lib/dates";
@@ -12,10 +12,12 @@ import { eventWhen } from "../lib/plans";
 import { Stars } from "../components/Stars";
 import { groupInfo } from "../lib/groupInfo";
 import type { ActivityLog, Cat, Media } from "../lib/types";
+import { errorText, uploadMedia } from "../db";
 
-const MAX_VIDEO_BYTES = 4 * 1024 * 1024;
+/** Matches the 50 MB file limit on the Supabase "media" bucket. */
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 
-/** Downscale photos so they fit in demo storage. */
+/** Downscale photos before upload (max 1000px, JPEG). */
 function readImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -33,16 +35,8 @@ function readImage(file: File): Promise<string> {
     img.src = url;
   });
 }
-const readDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-
 export function LogPage() {
-  const { me, state, myGroups, update, toast } = useStore();
+  const { me, state, board, myGroups, update, toast } = useStore();
   const { route, go } = useNav();
   const [gid, setGid] = useState(route.groupId ?? myGroups[0]?.id);
   const g = myGroups.find((x) => x.id === gid) ?? myGroups[0];
@@ -59,6 +53,9 @@ export function LogPage() {
   const [price, setPrice] = useState(g?.plan?.confirmedOptionId && g.plan.price != null ? String(g.plan.price) : "");
   const [myRate, setMyRate] = useState(0);
   const [media, setMedia] = useState<Media[]>([]);
+  /** Original files for videos, keyed by media id. Photos upload from their resized preview. */
+  const videoFiles = useRef(new Map<string, Blob>());
+  const [saving, setSaving] = useState(false);
   const [linkPlan, setLinkPlan] = useState(!!g?.plan?.confirmedOptionId);
   const [placeId, setPlaceId] = useState<string | undefined>(g?.plan?.confirmedOptionId ? g.plan.placeId : undefined);
   const data = usePlaceData();
@@ -71,12 +68,12 @@ export function LogPage() {
   const pts = useMemo(
     () =>
       g
-        ? scoreLog({ cat, labels, date: date || todayISO(), attendeeIds: who }, g.memberIds.length, state.logs, plan, {
-            labelNiche: data?.labels,
-            placeNiche: spot?.niche,
+        ? scoreLog({ cat, labels, date: date || todayISO(), attendeeIds: who }, g.memberIds.length, board.logs, plan, {
+            labelRarity: data?.labels,
+            placeRarity: spot?.rarity,
           })
         : null,
-    [g, cat, labels, date, who, state.logs, plan, data, spot],
+    [g, cat, labels, date, who, board.logs, plan, data, spot],
   );
 
   // Count-up animation for the big number, as in the original design.
@@ -129,21 +126,41 @@ export function LogPage() {
     for (const f of [...files]) {
       if (f.type.startsWith("image/")) out.push({ id: uid(), kind: "image", url: await readImage(f) });
       else if (f.type.startsWith("video/")) {
-        if (f.size > MAX_VIDEO_BYTES) toast(`${f.name} is over 4 MB, too big for the demo`);
-        else out.push({ id: uid(), kind: "video", url: await readDataUrl(f) });
+        if (f.size > MAX_VIDEO_BYTES) toast(`${f.name} is over 50 MB`);
+        else {
+          const id = uid();
+          videoFiles.current.set(id, f);
+          out.push({ id, kind: "video", url: URL.createObjectURL(f) });
+        }
       }
     }
     setMedia((m) => [...m, ...out]);
   };
 
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     if (!title.trim()) return setBad(true);
     if (!who.length) return toast("Pick at least one person who made it out");
     const typed = price.trim() === "" ? null : Math.round(Number(price));
     if (typed !== null && (Number.isNaN(typed) || typed < 0)) return toast("Cost has to be zero or more");
     const attendees = g.memberIds.filter((m) => who.includes(m));
+    const logId = uid();
+    let uploaded: Media[];
+    setSaving(true);
+    try {
+      uploaded = await Promise.all(
+        media.map(async (m) => {
+          const blob = videoFiles.current.get(m.id) ?? (await (await fetch(m.url)).blob());
+          return { ...m, url: await uploadMedia(g.id, logId, m.id, blob) };
+        }),
+      );
+    } catch (e) {
+      setSaving(false);
+      return toast(`Couldn't upload photos/videos: ${errorText(e)}`);
+    }
+    setSaving(false);
     const log: ActivityLog = {
-      id: uid(),
+      id: logId,
       groupId: g.id,
       authorId: me!.id,
       title: title.trim(),
@@ -154,7 +171,7 @@ export function LogPage() {
       date: date || todayISO(),
       where: where.trim(),
       attendeeIds: attendees,
-      media,
+      media: uploaded,
       eventId: plan?.id,
       placeId: spot?.id,
       price: typed,
@@ -172,10 +189,10 @@ export function LogPage() {
         gg.plan = null;
       }
     });
-    if (!ok) return toast("Storage is full. Try fewer or smaller photos/videos.");
+    if (!ok) return toast("Couldn't save. Are you still signed in?");
     const after = groupInfo({ ...state, logs: [...state.logs, log] }, g).logs.findIndex((l) => l.id === log.id);
     go("group", { groupId: g.id, grow: after < MAX_FRUIT ? after : null });
-    toast(`+${pts.total} pts${pts.krillion ? " · Krillion! First in the app this month" : ""} · a new branch grew`);
+    toast(`+${pts.total} pts${pts.firstBloom ? " · First Bloom! First in the app this month" : ""} · a new branch grew`);
   };
 
   const row = (label: string, v: number, extra?: string) => (
@@ -228,7 +245,7 @@ export function LogPage() {
           </label>
           <div className="f">
             <span>
-              Location <em>pick a real place to score its nicheness from the datasets</em>
+              Location <em>pick a real place to score its rarity from the datasets</em>
             </span>
             <PlaceSearch
               data={data}
@@ -245,11 +262,11 @@ export function LogPage() {
                 <span className="place-emoji">{spot.emoji}</span>
                 <span className="t">
                   <b>
-                    {spot.kindLabel} · nicheness {spot.niche.toFixed(2)}
+                    {spot.kindLabel} · rarity {spot.rarity.toFixed(2)}
                   </b>
                   <span className="muted">{spot.detail}</span>
                 </span>
-                <NicheTag niche={spot.niche} data={data} />
+                <RarityTag rarity={spot.rarity} data={data} />
                 <button className="link" onClick={() => setPlaceId(undefined)}>
                   Clear
                 </button>
@@ -319,7 +336,7 @@ export function LogPage() {
                 >
                   <CatIcon cat={k} />
                   {CATS[k].label}
-                  <span className="bonus">{spot ? "tree icon" : `niche +${Math.round(CATS[k].niche * 100)}`}</span>
+                  <span className="bonus">{spot ? "tree icon" : `rarity +${Math.round(CATS[k].rarity * 100)}`}</span>
                 </button>
               ))}
             </div>
@@ -365,7 +382,7 @@ export function LogPage() {
           </label>
           <div className="f" style={{ margin: 0 }}>
             <span>
-              Photos & videos <em>optional, videos up to 4 MB</em>
+              Photos & videos <em>optional, videos up to 50 MB</em>
             </span>
             <input ref={fileRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => (addFiles(e.target.files), (e.target.value = ""))} />
             <button className="drop" style={{ width: "100%", background: "none" }} onClick={() => fileRef.current?.click()}>
@@ -393,17 +410,17 @@ export function LogPage() {
             <p className="muted small">points for this log</p>
             <div className="breakdown">
               {row(
-                "Nicheness",
-                pts.niche,
+                "Rarity",
+                pts.rarity,
                 spot && data
-                  ? `${spot.name}, rarer than ${nichePercentile(data, spot.niche)}% of Boston spots`
+                  ? `${spot.name}, rarer than ${rarityPercentile(data, spot.rarity)}% of Boston spots`
                   : labels.length
                     ? "category or rarest label"
                     : CATS[cat].label,
               )}
               {row("Group turnout", pts.turnout, `${who.length} of ${g.memberIds.length}`)}
               {row("Finalization speed", pts.speed, plan ? (plan.confirmedAt ? "linked plan" : "plan not locked in") : "no plan linked")}
-              {row("Krillion bonus", pts.krillion, pts.krillion ? "first in the app this month" : "already done this month")}
+              {row("First Bloom bonus", pts.firstBloom, pts.firstBloom ? "first in the app this month" : "already done this month")}
               {row("Holiday bonus", pts.holiday, pts.holidayName ?? "regular day")}
               <span className="muted">Rarer activities and full turnout count the most.</span>
             </div>
@@ -413,8 +430,8 @@ export function LogPage() {
             <p className="muted small" style={{ margin: "4px 0 16px" }}>
               Everyone in {g.name} sees it right away.
             </p>
-            <button className="btn btn-primary block" onClick={save}>
-              Save activity <Icon name="arrow" />
+            <button className="btn btn-primary block" onClick={() => void save()} disabled={saving}>
+              {saving ? "Uploading…" : "Save activity"} <Icon name="arrow" />
             </button>
           </section>
         </aside>

@@ -19,7 +19,7 @@ import { NextUp, VotesTab } from "./Votes";
 const fmtN = (n: number) => n.toLocaleString("en-US");
 
 export function GroupPage() {
-  const { me, state, myGroups, nameOf } = useStore();
+  const { me, state, board, myGroups, nameOf } = useStore();
   const { route, go } = useNav();
   const [sheet, setSheet] = useState<"invite" | "new" | "bud" | null>(null);
   const [openLog, setOpenLog] = useState<number | null>(null);
@@ -44,8 +44,8 @@ export function GroupPage() {
   const h = score.health;
   const duo = isDuo(g);
   const rows = duo
-    ? boardRows("duos", state.groups, state.logs, COMPETITORS.duos, {})
-    : boardRows("local", state.groups, state.logs, COMPETITORS.local, { region: g.region });
+    ? boardRows("duos", board.groups, board.logs, COMPETITORS.duos, {})
+    : boardRows("local", board.groups, board.logs, COMPETITORS.local, { region: g.region });
   const rank = rows.find((r) => r.id === g.id)?.rank;
   const tab: GroupTab = route.tab ?? "overview";
   const p = g.plan;

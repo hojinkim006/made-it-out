@@ -8,7 +8,7 @@ Boston places. Output is one JSON object per line:
      "address": "145 Ipswich St, Boston", "website": "..."}
 
 Usage:
-    python3 -m make_it_out_pipeline.osm_places \
+    python3 -m made_it_out_pipeline.osm_places \
         --raw ../data/raw/osm/boston_overpass.json \
         --out ../data/processed/boston_places.jsonl
 
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any, Iterable, Iterator
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-USER_AGENT = "make-it-out-pipeline/0.1"
+USER_AGENT = "made-it-out-pipeline/0.1"
 
 # Boston, Cambridge, Somerville, Brookline and nearby (south, west, north, east).
 DEFAULT_BBOX = (42.227, -71.191, 42.420, -70.986)

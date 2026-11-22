@@ -4,12 +4,12 @@ import { daysBetween, monthKey, parseD, todayISO } from "./dates";
 /*
  * Scoring rules. Keep docs/SCORING.md in sync.
  * Factors, largest share of points first:
- *   nicheness > group turnout > finalization speed > Krillion bonus > holiday bonus
+ *   rarity > group turnout > finalization speed > First Bloom bonus > holiday bonus
  */
-export const NICHE_MAX = 100;
+export const RARITY_MAX = 100;
 export const TURNOUT_MAX = 60;
 export const SPEED_MAX = 40;
-export const KRILLION_BONUS = 30;
+export const FIRST_BLOOM_BONUS = 30;
 export const HOLIDAY_BONUS = 20;
 /** Plans confirmed after this many hours earn no speed points. */
 export const SPEED_WINDOW_H = 72;
@@ -17,22 +17,22 @@ export const SPEED_WINDOW_H = 72;
 export const MIN_GROUP = 2;
 export const MAX_GROUP = 8;
 
-export const CATS: Record<Cat, { label: string; emoji: string; niche: number }> = {
-  water: { label: "Water", emoji: "🛶", niche: 0.85 },
-  art: { label: "Art", emoji: "🎨", niche: 0.6 },
-  outdoors: { label: "Outdoors", emoji: "🥾", niche: 0.6 },
-  music: { label: "Music", emoji: "🎷", niche: 0.5 },
-  sports: { label: "Sports", emoji: "⛸️", niche: 0.4 },
-  games: { label: "Games", emoji: "🎲", niche: 0.3 },
-  food: { label: "Food", emoji: "🍜", niche: 0.12 },
-  coffee: { label: "Coffee", emoji: "☕", niche: 0.05 },
+export const CATS: Record<Cat, { label: string; emoji: string; rarity: number }> = {
+  water: { label: "Water", emoji: "🛶", rarity: 0.85 },
+  art: { label: "Art", emoji: "🎨", rarity: 0.6 },
+  outdoors: { label: "Outdoors", emoji: "🥾", rarity: 0.6 },
+  music: { label: "Music", emoji: "🎷", rarity: 0.5 },
+  sports: { label: "Sports", emoji: "⛸️", rarity: 0.4 },
+  games: { label: "Games", emoji: "🎲", rarity: 0.3 },
+  food: { label: "Food", emoji: "🍜", rarity: 0.12 },
+  coffee: { label: "Coffee", emoji: "☕", rarity: 0.05 },
 };
 
 /**
- * Label nicheness in [0, 1]. Will be replaced by pipeline output
- * (data/processed/nicheness.json). Unknown labels don't change the score.
+ * Label rarity in [0, 1]. Will be replaced by pipeline output
+ * (data/processed/rarity.json). Unknown labels don't change the score.
  */
-export const LABEL_NICHE: Record<string, number> = {
+export const LABEL_RARITY: Record<string, number> = {
   restaurant: 0.08,
   cafe: 0.05,
   bar: 0.15,
@@ -56,23 +56,23 @@ export const normLabel = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
-export interface NicheSources {
-  /** Label scores from the data pipeline (web/public/data/nicheness.json). */
-  labelNiche?: Record<string, number>;
-  /** Nicheness of the specific place or event that was picked. */
-  placeNiche?: number;
+export interface RaritySources {
+  /** Label scores from the data pipeline (web/public/data/rarity.json). */
+  labelRarity?: Record<string, number>;
+  /** Rarity of the specific place or event that was picked. */
+  placeRarity?: number;
 }
 
 /**
- * Nicheness in [0, 1]. With a picked place, the dataset score for that place
+ * Rarity in [0, 1]. With a picked place, the dataset score for that place
  * replaces the self-chosen category (so picking "Water" can't inflate a café).
  */
-export function nicheness(cat: Cat, labels: string[], src: NicheSources = {}): number {
+export function rarityOf(cat: Cat, labels: string[], src: RaritySources = {}): number {
   const fromLabels = labels.map((l) => {
     const k = normLabel(l);
-    return src.labelNiche?.[k] ?? LABEL_NICHE[k] ?? 0;
+    return src.labelRarity?.[k] ?? LABEL_RARITY[k] ?? 0;
   });
-  const base = src.placeNiche ?? CATS[cat].niche;
+  const base = src.placeRarity ?? CATS[cat].rarity;
   return Math.max(base, ...fromLabels);
 }
 
@@ -117,10 +117,10 @@ export const activityKey = (log: Pick<ActivityLog, "labels" | "cat">) =>
   log.labels.length ? normLabel(log.labels[0]) : log.cat;
 
 /**
- * Krillion bonus: nobody in the whole app has logged this activity yet this month.
+ * First Bloom bonus: nobody in the whole app has logged this activity yet this month.
  * @param earlier every log in the database saved before this one
  */
-export function isKrillion(
+export function isFirstBloom(
   log: Pick<ActivityLog, "labels" | "cat" | "date">,
   earlier: Pick<ActivityLog, "labels" | "cat" | "date">[],
 ): boolean {
@@ -134,15 +134,15 @@ export function scoreLog(
   memberCount: number,
   earlier: Pick<ActivityLog, "labels" | "cat" | "date">[],
   plan?: Pick<Plan, "createdAt" | "confirmedAt">,
-  src: NicheSources = {},
+  src: RaritySources = {},
 ): PointBreakdown {
-  const niche = Math.round(nicheness(log.cat, log.labels, src) * NICHE_MAX);
+  const rarity = Math.round(rarityOf(log.cat, log.labels, src) * RARITY_MAX);
   const turnout = turnoutPoints(log.attendeeIds.length, memberCount);
   const speed = speedPoints(plan);
-  const krillion = isKrillion(log, earlier) ? KRILLION_BONUS : 0;
+  const firstBloom = isFirstBloom(log, earlier) ? FIRST_BLOOM_BONUS : 0;
   const holidayName = holidayFor(log.date);
   const holiday = holidayName ? HOLIDAY_BONUS : 0;
-  return { niche, turnout, speed, krillion, holiday, holidayName, total: niche + turnout + speed + krillion + holiday };
+  return { rarity, turnout, speed, firstBloom, holiday, holidayName, total: rarity + turnout + speed + firstBloom + holiday };
 }
 
 /* ---------------- streaks, decay, tree health ---------------- */

@@ -30,6 +30,6 @@ cd pipeline && ruff check . && pytest
 - [ ] **M1 Skeleton**: tabs, mock data, tree visual, scoring core (this template)
 - [ ] **M2 Logging**: log an activity (place, date, people), saved to backend
 - [ ] **M3 Events**: propose event, vote on time/date, confirm
-- [ ] **M4 Data**: pipeline outputs nicheness per category; app consumes it
+- [ ] **M4 Data**: pipeline outputs rarity per category; app consumes it
 - [ ] **M5 Leaderboard**: real rankings, Boston / per-school filters
 - [ ] **M6 Polish**: tree growth animation, emoji fruit, demo dataset

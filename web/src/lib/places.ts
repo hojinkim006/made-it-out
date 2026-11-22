@@ -3,7 +3,7 @@ import type { Cat } from "./types";
 import { CATS, normLabel } from "./scoring";
 
 /*
- * Place, event and nicheness data built by pipeline/ (make_it_out_pipeline.app_data)
+ * Place, event and rarity data built by pipeline/ (made_it_out_pipeline.app_data)
  * from OpenStreetMap, the Yelp Open Dataset and City of Boston event licenses.
  * Served as static JSON from web/public/data/.
  */
@@ -19,7 +19,7 @@ export interface Place {
   address: string | null;
   lat: number;
   lon: number;
-  niche: number; // 0..1
+  rarity: number; // 0..1
   yelpCount: number; // businesses of this kind in the Yelp dataset
   localCount: number; // places of this kind in Boston (OSM)
 }
@@ -33,7 +33,7 @@ export interface CityEvent {
   end: string;
   where: string;
   hood: string;
-  niche: number;
+  rarity: number;
 }
 
 export interface PlaceData {
@@ -50,7 +50,7 @@ export interface Spot {
   hood: string;
   cat: Cat;
   labels: string[];
-  niche: number;
+  rarity: number;
   kindLabel: string;
   emoji: string;
   date?: string; // events only
@@ -63,7 +63,7 @@ export function loadPlaceData(): Promise<PlaceData> {
   if (!cache) {
     const base = `${import.meta.env.BASE_URL}data/`;
     const get = (f: string) => fetch(base + f).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${f}: ${r.status}`))));
-    cache = Promise.all([get("places.json"), get("events.json"), get("nicheness.json")])
+    cache = Promise.all([get("places.json"), get("events.json"), get("rarity.json")])
       .then(([p, e, n]) => ({ places: p.places, events: e.events, labels: n.labels, generated: p.generated }))
       .catch((err) => {
         cache = null;
@@ -184,7 +184,7 @@ export function placeSpot(p: Place): Spot {
     hood: p.hood,
     cat: p.cat,
     labels: p.labels,
-    niche: p.niche,
+    rarity: p.rarity,
     kindLabel: kind,
     emoji: (p.cuisine && CUISINE_EMOJI[p.cuisine]) || KIND_EMOJI[p.kind] || CATS[p.cat].emoji,
     detail: `${p.localCount} like it in Boston · ${p.yelpCount.toLocaleString("en-US")} in Yelp's dataset`,
@@ -198,7 +198,7 @@ export function eventSpot(e: CityEvent): Spot {
     hood: e.hood,
     cat: e.cat,
     labels: [e.type],
-    niche: e.niche,
+    rarity: e.rarity,
     kindLabel: pretty(e.type),
     emoji: EVENT_EMOJI[e.type] ?? "🎟️",
     date: e.date,
@@ -233,7 +233,7 @@ export function searchSpots(data: PlaceData, query: string, today: string, limit
     const name = fold(s.name);
     const hay = `${name} ${fold(s.kindLabel)} ${fold(s.hood)} ${s.labels.join(" ")}`;
     if (!words.every((w) => hay.includes(w))) return;
-    const score = (name.startsWith(q) ? 3 : name.includes(q) ? 2 : words.every((w) => name.includes(w)) ? 1 : 0) + s.niche;
+    const score = (name.startsWith(q) ? 3 : name.includes(q) ? 2 : words.every((w) => name.includes(w)) ? 1 : 0) + s.rarity;
     scored.push({ s, score });
   };
   data.places.forEach((p) => consider(placeSpot(p)));
@@ -241,21 +241,21 @@ export function searchSpots(data: PlaceData, query: string, today: string, limit
   return scored.sort((a, b) => b.score - a.score).slice(0, limit).map((x) => x.s);
 }
 
-/** Share of Boston places this nicheness beats, 0..100. */
-export function nichePercentile(data: PlaceData, niche: number): number {
+/** Share of Boston places this rarity beats, 0..100. */
+export function rarityPercentile(data: PlaceData, rarity: number): number {
   if (!data.places.length) return 0;
-  const below = data.places.filter((p) => p.niche < niche).length;
+  const below = data.places.filter((p) => p.rarity < rarity).length;
   return Math.round((below / data.places.length) * 100);
 }
 
 /**
- * Niche places the group hasn't done yet, one per kind for variety.
+ * Rare places the group hasn't done yet, one per kind for variety.
  * @param done labels and spot ids already in the group's logs
  */
 export function suggestPlaces(data: PlaceData, done: Set<string>, opts: { cat?: Cat; limit?: number; offset?: number } = {}): Spot[] {
   const seenKinds = new Set<string>();
   const out: Spot[] = [];
-  const ranked = [...data.places].filter((p) => !opts.cat || p.cat === opts.cat).sort((a, b) => b.niche - a.niche || a.name.localeCompare(b.name));
+  const ranked = [...data.places].filter((p) => !opts.cat || p.cat === opts.cat).sort((a, b) => b.rarity - a.rarity || a.name.localeCompare(b.name));
   for (const p of ranked) {
     const kind = p.cuisine ?? p.kind;
     if (seenKinds.has(kind) || done.has(p.id) || p.labels.some((l) => done.has(normLabel(l)))) continue;

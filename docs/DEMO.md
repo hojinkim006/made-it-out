@@ -4,10 +4,9 @@
 cd web && npm install && npm run dev
 ```
 
-## How "live" works without a backend
-All app data lives in the browser's `localStorage`. Every window of the app on the **same computer and browser** updates instantly (via the `storage` event), and each window keeps its own signed-in user. That's what powers the 4-screen demo. To sync across different devices, swap `web/src/store.tsx` for a real backend (e.g. Supabase realtime).
+## How "live" works
+> **Out of date:** the app now uses Supabase, so the seed accounts and groups below no longer load and there is no Reset demo button. To demo, sign up 3–4 real accounts (one per browser or private window), add each other as friends by username, and create a group. Changes sync live across devices. `web/src/data/seed.ts` is still used for tests and the sample tree on the welcome screen.
 
-**Reset demo** (footer) restores the seed data in every open window.
 
 ## Accounts
 | Name | Username | Email |

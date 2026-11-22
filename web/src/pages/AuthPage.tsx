@@ -1,28 +1,31 @@
-import { useState, type FormEvent } from "react";
-import { useStore, uid } from "../store";
-import { hashPassword, login, REGIONS, schoolForEmail, validateSignUp, type SignUpInput } from "../lib/auth";
+import { useMemo, useState, type FormEvent } from "react";
+import { useStore } from "../store";
+import { supabase } from "../supabase";
+import { errorText } from "../db";
+import { REGIONS, schoolForEmail, validateSignUp, type SignUpInput } from "../lib/auth";
 import { Icon } from "../components/Icons";
 import { Seg } from "../components/Sheet";
 import { Tree } from "../components/Tree";
 import { groupHealth } from "../lib/scoring";
+import { seed } from "../data/seed";
 
 export function AuthPage() {
-  const { state } = useStore();
   const [mode, setMode] = useState<"login" | "signup">("login");
-  const showcase = state.groups[0];
-  const logs = state.logs.filter((l) => l.groupId === showcase?.id);
+  // A sample tree for the welcome card. Real data needs an account.
+  const sample = useMemo(() => {
+    const s = seed();
+    return s.logs.filter((l) => l.groupId === s.groups[0]?.id);
+  }, []);
 
   return (
     <div className="auth">
       <section className="card auth-hero">
         <div className="eyebrow">Less group chat. More good stories.</div>
-        <h1>make it out.</h1>
+        <h1>made it out.</h1>
         <p className="sub">Plan hangouts in one place, log what you did, and watch your group's tree grow.</p>
-        {showcase && (
-          <div className="gprev">
-            <Tree logs={logs} stage="Full canopy" health={groupHealth(logs.map((l) => l.date))} mini />
-          </div>
-        )}
+        <div className="gprev">
+          <Tree logs={sample} stage="Full canopy" health={groupHealth(sample.map((l) => l.date))} mini />
+        </div>
       </section>
       <section className="card pad-lg form">
         <div style={{ marginBottom: 22 }}>
@@ -35,26 +38,54 @@ export function AuthPage() {
             ]}
           />
         </div>
-        {mode === "login" ? <Login /> : <SignUp />}
+        {mode === "login" ? <Login /> : <SignUp onDone={() => setMode("login")} />}
       </section>
     </div>
   );
 }
 
 function Login() {
-  const { state, signIn } = useStore();
   const [id, setId] = useState("");
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const mismatch = "That email, username or phone and password don't match.";
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    setErr("");
+    setNote("");
+    if (!id.trim() || !pw) return setErr("Enter your login and password");
     setBusy(true);
-    const user = await login(state.users, id, pw);
-    setBusy(false);
-    if (!user) return setErr("That email, username or phone and password don't match.");
-    signIn(user.id);
+    try {
+      let email = id.trim();
+      if (!email.includes("@") || email.startsWith("@")) {
+        // Username or phone: the database checks the password before revealing the email.
+        const { data, error } = await supabase.rpc("login_email", { p_identifier: email, p_password: pw });
+        if (error) return setErr(errorText(error));
+        if (!data) return setErr(mismatch);
+        email = data as string;
+      }
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      if (error) {
+        if (/confirm/i.test(error.message)) return setErr("Confirm your email first. Check your inbox for the link.");
+        if (/invalid login/i.test(error.message)) return setErr(mismatch);
+        return setErr(error.message);
+      }
+      // The store notices the new session and loads your data.
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const forgot = async () => {
+    setErr("");
+    const email = id.trim();
+    if (!email.includes("@") || email.startsWith("@")) return setErr("Type your account email above, then tap Forgot password.");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin });
+    if (error) return setErr(error.message);
+    setNote(`If ${email} has an account, a reset link is on its way.`);
   };
 
   return (
@@ -70,24 +101,18 @@ function Login() {
         {err && <span className="err-text">{err}</span>}
       </label>
       <button className="btn btn-primary block" disabled={busy}>
-        Log in <Icon name="arrow" />
+        {busy ? "Logging in…" : "Log in"} <Icon name="arrow" />
       </button>
-      <p className="hint" style={{ marginTop: 18 }}>
-        Demo accounts (passwords are in the project overview):
-      </p>
-      <div className="demo-users">
-        {state.users.map((u) => (
-          <button type="button" key={u.id} className="chip" onClick={() => setId(u.username)}>
-            @{u.username}
-          </button>
-        ))}
-      </div>
+      <button type="button" className="btn btn-soft sm mt" onClick={forgot}>
+        Forgot password
+      </button>
+      {note && <p className="hint" style={{ marginTop: 12 }}>{note}</p>}
     </form>
   );
 }
 
-function SignUp() {
-  const { state, update, signIn, toast } = useStore();
+function SignUp({ onDone }: { onDone: () => void }) {
+  const { toast } = useStore();
   const [f, setF] = useState<SignUpInput & { schoolEmail: string }>({
     email: "",
     username: "",
@@ -98,35 +123,76 @@ function SignUp() {
     schoolEmail: "",
   });
   const [errs, setErrs] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState("");
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    const v: Record<string, string> = { ...validateSignUp(state.users, f) };
+    // Format checks here; uniqueness is checked by the database.
+    const v: Record<string, string> = { ...validateSignUp([], f) };
     const school = f.schoolEmail ? schoolForEmail(f.schoolEmail) : null;
     if (f.schoolEmail && !school) v.schoolEmail = "Use a supported university email (e.g. @bu.edu)";
     setErrs(v);
     if (Object.keys(v).length) return;
-    const id = uid();
-    const username = f.username.toLowerCase();
-    const passHash = await hashPassword(username, f.password);
-    update((s) => {
-      s.users.push({
-        id,
-        username,
+
+    setBusy(true);
+    try {
+      const username = f.username.toLowerCase();
+      const taken = await supabase.rpc("signup_conflicts", { p_username: username, p_phone: f.phone });
+      if (taken.error) return setErrs({ email: errorText(taken.error) });
+      const conflicts = (taken.data ?? []) as string[];
+      if (conflicts.length) {
+        return setErrs({
+          ...(conflicts.includes("username") ? { username: "Username is taken" } : {}),
+          ...(conflicts.includes("phone") ? { phone: "Phone already has an account" } : {}),
+        });
+      }
+
+      const { data, error } = await supabase.auth.signUp({
         email: f.email.trim(),
-        phone: f.phone.trim(),
-        passHash,
-        displayName: f.displayName.trim(),
-        region: f.region,
-        school: school ?? undefined,
-        schoolEmail: school ? f.schoolEmail.trim() : undefined,
-        friendIds: [],
+        password: f.password,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            username,
+            display_name: f.displayName.trim(),
+            phone: f.phone,
+            region: f.region,
+            school: school ?? "",
+            school_email: school ? f.schoolEmail.trim() : "",
+          },
+        },
       });
-    });
-    signIn(id);
-    toast(`Welcome, ${f.displayName.trim()}! Add friends by username to start a group.`);
+      if (error) {
+        if (/registered|exists/i.test(error.message)) return setErrs({ email: "Email already has an account" });
+        if (/password/i.test(error.message)) return setErrs({ password: error.message });
+        return setErrs({ email: error.message });
+      }
+      // With email confirmation on, an existing email comes back as a user with no identities.
+      if (data.user && data.user.identities?.length === 0) return setErrs({ email: "Email already has an account" });
+      if (data.session) {
+        toast(`Welcome, ${f.displayName.trim()}! Add friends by username to start a group.`);
+      } else {
+        setSentTo(f.email.trim());
+      }
+    } finally {
+      setBusy(false);
+    }
   };
+
+  if (sentTo)
+    return (
+      <div>
+        <h2>Check your email.</h2>
+        <p className="sub">
+          We sent a confirmation link to <b>{sentTo}</b>. Open it, then log in here.
+        </p>
+        <button className="btn btn-primary block mt" onClick={onDone}>
+          Go to log in <Icon name="arrow" />
+        </button>
+      </div>
+    );
 
   const field = (k: keyof typeof f, label: string, type = "text", extra: Record<string, string> = {}) => (
     <label className="f">
@@ -155,8 +221,8 @@ function SignUp() {
         </select>
       </label>
       {field("schoolEmail", "University email (optional, joins your school's board)", "email", { placeholder: "you@bu.edu" })}
-      <button className="btn btn-primary block">
-        Create account <Icon name="arrow" />
+      <button className="btn btn-primary block" disabled={busy}>
+        {busy ? "Creating…" : "Create account"} <Icon name="arrow" />
       </button>
     </form>
   );

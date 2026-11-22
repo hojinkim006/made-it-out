@@ -4,7 +4,6 @@ import { useNav } from "../nav";
 import { Avatar, CatIcon, Icon } from "../components/Icons";
 import { Tree } from "../components/Tree";
 import { LogSheet, NewGroupSheet } from "../components/GroupSheets";
-import { findUser } from "../lib/auth";
 import { boardRows, isDuo } from "../lib/scoring";
 import { fmtD, fmtT, MON, parseD } from "../lib/dates";
 import { groupInfo, myPoints } from "../lib/groupInfo";
@@ -15,7 +14,7 @@ import { COMPETITORS } from "../data/seed";
 const fmtN = (n: number) => n.toLocaleString("en-US");
 
 export function ProfilePage() {
-  const { me, state, myGroups } = useStore();
+  const { me, state, board, myGroups } = useStore();
   const { go } = useNav();
   const [sheet, setSheet] = useState<"new" | null>(null);
   const [open, setOpen] = useState<{ logs: typeof state.logs; i: number } | null>(null);
@@ -35,8 +34,8 @@ export function ProfilePage() {
 
   const rankIn = (gid: string, duo: boolean) => {
     const rows = duo
-      ? boardRows("duos", state.groups, state.logs, COMPETITORS.duos, {})
-      : boardRows("local", state.groups, state.logs, COMPETITORS.local, { region: u.region });
+      ? boardRows("duos", board.groups, board.logs, COMPETITORS.duos, {})
+      : boardRows("local", board.groups, board.logs, COMPETITORS.local, { region: u.region });
     return rows.find((r) => r.id === gid)?.rank;
   };
 
@@ -182,25 +181,23 @@ export function ProfilePage() {
 }
 
 function Friends() {
-  const { me, state, update, toast } = useStore();
+  const { me, state, addFriend, toast } = useStore();
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const friends = state.users.filter((u) => me!.friendIds.includes(u.id));
 
-  const add = () => {
+  const add = async () => {
     const name = q.trim().replace(/^@/, "").toLowerCase();
-    const u = state.users.find((x) => x.username.toLowerCase() === name);
-    if (!u) return setErr(findUser(state.users, q) ? "Add friends by their username" : `No one with the username @${name}`);
-    if (u.id === me!.id) return setErr("That's you!");
-    if (me!.friendIds.includes(u.id)) return setErr(`You're already friends with ${u.displayName}`);
-    update((s) => {
-      s.users.find((x) => x.id === me!.id)!.friendIds.push(u.id);
-      const them = s.users.find((x) => x.id === u.id)!;
-      if (!them.friendIds.includes(me!.id)) them.friendIds.push(me!.id);
-    });
+    if (!name) return setErr("Type a username");
+    if (name.includes("@") || /^\d[\d\s()-]+$/.test(name)) return setErr("Add friends by their username");
+    setBusy(true);
+    const res = await addFriend(name);
+    setBusy(false);
+    if ("error" in res) return setErr(res.error);
     setQ("");
     setErr("");
-    toast(`You and ${u.displayName} are now friends`);
+    toast(`You and ${res.user.displayName} are now friends`);
   };
 
   return (
@@ -215,11 +212,11 @@ function Friends() {
         className="friend-add"
         onSubmit={(e) => {
           e.preventDefault();
-          add();
+          void add();
         }}
       >
         <input className="field" placeholder="@username" value={q} onChange={(e) => (setQ(e.target.value), setErr(""))} />
-        <button className="btn btn-primary sm">
+        <button className="btn btn-primary sm" disabled={busy}>
           <Icon name="plus" /> Add
         </button>
       </form>

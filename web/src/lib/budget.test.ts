@@ -19,7 +19,7 @@ const log = (over: Partial<ActivityLog> = {}): ActivityLog => ({
   est: null,
   ratings: {},
   comments: [],
-  points: { niche: 0, turnout: 0, speed: 0, krillion: 0, holiday: 0, holidayName: null, total: 0 },
+  points: { rarity: 0, turnout: 0, speed: 0, firstBloom: 0, holiday: 0, holidayName: null, total: 0 },
   ...over,
 });
 

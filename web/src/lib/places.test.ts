@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { nichePercentile, searchSpots, spotById, suggestPlaces, upcomingEvents, type PlaceData, type Place } from "./places";
-import { nicheness, scoreLog } from "./scoring";
+import { rarityPercentile, searchSpots, spotById, suggestPlaces, upcomingEvents, type PlaceData, type Place } from "./places";
+import { rarityOf, scoreLog } from "./scoring";
 
-const place = (id: string, name: string, kind: string, niche: number, over: Partial<Place> = {}): Place => ({
+const place = (id: string, name: string, kind: string, rarity: number, over: Partial<Place> = {}): Place => ({
   id,
   name,
   kind,
@@ -13,7 +13,7 @@ const place = (id: string, name: string, kind: string, niche: number, over: Part
   address: null,
   lat: 42.35,
   lon: -71.08,
-  niche,
+  rarity,
   yelpCount: 100,
   localCount: 3,
   ...over,
@@ -30,8 +30,8 @@ const data: PlaceData = {
     place("node/5", "Dunkin", "cafe", 0.15, { cat: "coffee", labels: ["cafe"] }),
   ],
   events: [
-    { id: "PUB1", name: "Roslindale Tree Lighting", type: "holiday-event", cat: "outdoors", date: "2026-11-28", end: "2026-11-28", where: "Adams Park", hood: "Roslindale", niche: 0.8 },
-    { id: "PUB2", name: "Fall Fest", type: "festival", cat: "outdoors", date: "2026-10-01", end: "2026-10-01", where: "Common", hood: "Boston", niche: 0.7 },
+    { id: "PUB1", name: "Roslindale Tree Lighting", type: "holiday-event", cat: "outdoors", date: "2026-11-28", end: "2026-11-28", where: "Adams Park", hood: "Roslindale", rarity: 0.8 },
+    { id: "PUB2", name: "Fall Fest", type: "festival", cat: "outdoors", date: "2026-10-01", end: "2026-10-01", where: "Common", hood: "Boston", rarity: 0.7 },
   ],
 };
 
@@ -50,7 +50,7 @@ describe("place data", () => {
     expect(spotById(data, "event/PUB1")!.emoji).toBe("✨");
     expect(spotById(data, "node/999")).toBeNull();
   });
-  it("suggests niche places not done yet, one per kind", () => {
+  it("suggests rare places not done yet, one per kind", () => {
     const ids = suggestPlaces(data, new Set()).map((s) => s.id);
     expect(ids).toEqual(["node/3", "node/1", "node/4", "node/5"]);
     const notBowled = suggestPlaces(data, new Set(["bowling-alley"])).map((s) => s.id);
@@ -61,21 +61,21 @@ describe("place data", () => {
     expect(upcomingEvents(data, "2026-11-21").map((e) => e.name)).toEqual(["Roslindale Tree Lighting"]);
   });
   it("ranks percentiles", () => {
-    expect(nichePercentile(data, 0.74)).toBe(80);
-    expect(nichePercentile(data, 0.1)).toBe(0);
+    expect(rarityPercentile(data, 0.74)).toBe(80);
+    expect(rarityPercentile(data, 0.1)).toBe(0);
   });
 });
 
-describe("dataset nicheness in scoring", () => {
+describe("dataset rarity in scoring", () => {
   it("a picked place replaces the self-chosen category", () => {
-    expect(nicheness("water", ["cafe"], { placeNiche: 0.15, labelNiche: data.labels })).toBe(0.15);
-    expect(nicheness("coffee", [], { placeNiche: 0.74 })).toBe(0.74);
+    expect(rarityOf("water", ["cafe"], { placeRarity: 0.15, labelRarity: data.labels })).toBe(0.15);
+    expect(rarityOf("coffee", [], { placeRarity: 0.74 })).toBe(0.74);
   });
   it("pipeline label scores override built-in ones", () => {
-    expect(nicheness("food", ["axe-throwing"], { labelNiche: { "axe-throwing": 0.5 } })).toBe(0.5);
+    expect(rarityOf("food", ["axe-throwing"], { labelRarity: { "axe-throwing": 0.5 } })).toBe(0.5);
   });
   it("feeds into log points", () => {
-    const p = scoreLog({ cat: "sports", labels: ["axe-throwing"], date: "2026-03-10", attendeeIds: ["a"] }, 1, [], undefined, { placeNiche: 0.74, labelNiche: data.labels });
-    expect(p.niche).toBe(74);
+    const p = scoreLog({ cat: "sports", labels: ["axe-throwing"], date: "2026-03-10", attendeeIds: ["a"] }, 1, [], undefined, { placeRarity: 0.74, labelRarity: data.labels });
+    expect(p.rarity).toBe(74);
   });
 });

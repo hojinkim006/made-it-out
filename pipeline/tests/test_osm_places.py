@@ -1,6 +1,6 @@
 import json
 
-from make_it_out_pipeline.osm_places import build_query, main, normalize
+from made_it_out_pipeline.osm_places import build_query, main, normalize
 
 
 def test_query_covers_bbox_and_tags():

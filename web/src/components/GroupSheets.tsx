@@ -254,9 +254,9 @@ export function LogSheet({ logs, index, onClose, onNav }: { logs: ActivityLog[];
           <span className="names">
             <b>+{p.total}</b>{" "}
             <span className="muted small">
-              niche {p.niche} · turnout {p.turnout}
+              rarity {p.rarity} · turnout {p.turnout}
               {p.speed ? ` · speed ${p.speed}` : ""}
-              {p.krillion ? ` · Krillion ${p.krillion}` : ""}
+              {p.firstBloom ? ` · First Bloom ${p.firstBloom}` : ""}
               {p.holiday ? ` · ${p.holidayName} ${p.holiday}` : ""}
             </span>
           </span>

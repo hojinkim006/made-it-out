@@ -1,22 +1,22 @@
-"""Build the place, event and nicheness data the web app loads.
+"""Build the place, event and rarity data the web app loads.
 
 Joins the three datasets:
   * OpenStreetMap (data/processed/boston_places.jsonl): real Boston places.
   * Yelp business file: how common each kind of place is nationally.
   * Boston special event licenses CSV: one-off local events.
 
-Place nicheness (0..1) blends national and local rarity:
-    niche = 0.6 * yelp_rarity + 0.4 * boston_rarity   (x0.8 for food/coffee places)
+Place rarity (0..1) blends national and local rarity:
+    rarity = 0.6 * yelp_rarity + 0.4 * boston_rarity   (x0.8 for food/coffee places)
 where rarity = 1 - log(1 + count) / log(1 + max_count). Restaurants use their
 cuisine (ramen, sushi...) when OSM knows it.
 
-Event nicheness: one-off events are niche by nature, so
-    niche = 0.65 + 0.35 * rarity_of_event_type_among_boston_events
+Event rarity: one-off events are rare by nature, so
+    rarity = 0.65 + 0.35 * rarity_of_event_type_among_boston_events
 
-Writes to web/public/data/: places.json, events.json, nicheness.json.
+Writes to web/public/data/: places.json, events.json, rarity.json.
 
 Usage (from pipeline/):
-    python3 -m make_it_out_pipeline.app_data
+    python3 -m made_it_out_pipeline.app_data
 """
 
 from __future__ import annotations
@@ -173,7 +173,7 @@ def label(s: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", s.lower()).strip("-")
 
 
-def rarity(counts: dict[str, int]) -> dict[str, float]:
+def log_rarity(counts: dict[str, int]) -> dict[str, float]:
     """1 - log(1+n)/log(1+max): most common -> 0, rarest -> near 1."""
     if not counts:
         return {}
@@ -226,11 +226,11 @@ def place_key(p: dict) -> str:
 
 
 def build_places(places: list[dict], yelp: dict[str, int]) -> tuple[list[dict], dict[str, float]]:
-    """Score every OSM place; returns (places, label -> nicheness)."""
+    """Score every OSM place; returns (places, label -> rarity)."""
     places = [p for p in places if p["category"] in OSM_TO_APP]
     local_counts = Counter(place_key(p) for p in places)
-    yelp_r = rarity(dict(yelp))
-    local_r = rarity(local_counts)
+    yelp_r = log_rarity(dict(yelp))
+    local_r = log_rarity(local_counts)
 
     out: list[dict] = []
     for p in places:
@@ -239,10 +239,10 @@ def build_places(places: list[dict], yelp: dict[str, int]) -> tuple[list[dict], 
         cuisine = key if key != p["category"] else None
         if cuisine:
             yelp_cat = yelp_name_for_cuisine(cuisine, yelp) or yelp_cat
-        niche = YELP_WEIGHT * yelp_r.get(yelp_cat, 0.5) + LOCAL_WEIGHT * local_r[key]
+        rarity = YELP_WEIGHT * yelp_r.get(yelp_cat, 0.5) + LOCAL_WEIGHT * local_r[key]
         if app_cat in ("food", "coffee"):
-            niche *= DINING_DAMPING
-        niche = round(niche, 3)
+            rarity *= DINING_DAMPING
+        rarity = round(rarity, 3)
         out.append(
             {
                 "id": p["osm_id"],
@@ -255,7 +255,7 @@ def build_places(places: list[dict], yelp: dict[str, int]) -> tuple[list[dict], 
                 "address": p.get("address"),
                 "lat": round(p["lat"], 5),
                 "lon": round(p["lon"], 5),
-                "niche": niche,
+                "rarity": rarity,
                 "yelpCount": yelp.get(yelp_cat, 0),
                 "localCount": local_counts[key],
             }
@@ -268,8 +268,8 @@ def build_places(places: list[dict], yelp: dict[str, int]) -> tuple[list[dict], 
     by_label: dict[str, list[float]] = {}
     for rec in out:
         if rec["cuisine"]:
-            table[label(rec["cuisine"])] = rec["niche"]
-        by_label.setdefault(label(rec["kind"]), []).append(rec["niche"])
+            table[label(rec["cuisine"])] = rec["rarity"]
+        by_label.setdefault(label(rec["kind"]), []).append(rec["rarity"])
     for lb, vals in by_label.items():
         table[lb] = round(sum(vals) / len(vals), 3)
     return out, table
@@ -283,7 +283,7 @@ def build_events(
     ]
     rows = [r for r in rows if (r.get("App Name") or "").strip().upper() != "TEST"]
     typed = [(r, *classify_event(r["App Name"])) for r in rows]
-    type_r = rarity(Counter(t for _, t, _ in typed))
+    type_r = log_rarity(Counter(t for _, t, _ in typed))
     start, end = today - timedelta(days=back_days), today + timedelta(days=ahead_days)
 
     seen: set[tuple[str, str]] = set()
@@ -314,7 +314,7 @@ def build_events(
                 "end": (r.get("End Date and Time") or d)[:10],
                 "where": where[:120],
                 "hood": (r.get("City") or "Boston").strip(),
-                "niche": round(EVENT_BASE + (1 - EVENT_BASE) * type_r[typ], 3),
+                "rarity": round(EVENT_BASE + (1 - EVENT_BASE) * type_r[typ], 3),
             }
         )
     out.sort(key=lambda e: e["date"])
@@ -359,14 +359,14 @@ def main(argv: list | None = None) -> None:
         json.dumps({**meta, "events": events}, ensure_ascii=False, separators=(",", ":"))
     )
     labels = {**place_table, **event_table}
-    (args.out / "nicheness.json").write_text(
+    (args.out / "rarity.json").write_text(
         json.dumps({**meta, "labels": dict(sorted(labels.items()))}, indent=1)
     )
 
     print(f"places: {len(places)}  events: {len(events)}  labels: {len(labels)}  -> {args.out}")
-    top = sorted(places, key=lambda x: -x["niche"])[:8]
+    top = sorted(places, key=lambda x: -x["rarity"])[:8]
     for t in top:
-        print(f"  {t['niche']:.2f}  {t['name']} ({t['cuisine'] or t['kind']}, {t['hood']})")
+        print(f"  {t['rarity']:.2f}  {t['name']} ({t['cuisine'] or t['kind']}, {t['hood']})")
 
 
 if __name__ == "__main__":

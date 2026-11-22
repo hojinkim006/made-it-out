@@ -9,13 +9,13 @@ import { COMPETITORS } from "../data/seed";
 const fmtN = (n: number) => n.toLocaleString("en-US");
 
 export function LeaderboardPage() {
-  const { me, state, myGroups } = useStore();
+  const { me, board, myGroups } = useStore();
   const { go } = useNav();
   const [scope, setScope] = useState<BoardScope>("local");
   const [focus, setFocus] = useState<string | null>(null);
   const city = me!.region.split(",")[0];
 
-  const rows = boardRows(scope, state.groups, state.logs, scope === "school" && me!.school !== "Boston University" ? [] : COMPETITORS[scope], {
+  const rows = boardRows(scope, board.groups, board.logs, scope === "school" && me!.school !== "Boston University" ? [] : COMPETITORS[scope], {
     region: me!.region,
     school: me!.school,
     mineIds: myGroups.map((g) => g.id),
@@ -138,7 +138,7 @@ export function LeaderboardPage() {
                 <span>Lock plans in quickly for up to +40.</span>
               </div>
               <div>
-                <b>4. Be first (Krillion)</b>
+                <b>4. First Bloom</b>
                 <span>First log of an activity in the app this month: +30.</span>
               </div>
               <div>

@@ -5,8 +5,8 @@ import {
   groupHealth,
   groupScore,
   holidayFor,
-  isKrillion,
-  nicheness,
+  isFirstBloom,
+  rarityOf,
   scoreLog,
   speedPoints,
   stageFor,
@@ -44,15 +44,15 @@ const log = (over: Partial<ActivityLog> = {}): ActivityLog => ({
   est: null,
   ratings: {},
   comments: [],
-  points: { niche: 0, turnout: 0, speed: 0, krillion: 0, holiday: 0, holidayName: null, total: 10 },
+  points: { rarity: 0, turnout: 0, speed: 0, firstBloom: 0, holiday: 0, holidayName: null, total: 10 },
   ...over,
 });
 
 describe("factors", () => {
-  it("niche uses the most niche of category and labels", () => {
-    expect(nicheness("coffee", [])).toBe(0.05);
-    expect(nicheness("food", ["#Axe Throwing"])).toBe(0.9);
-    expect(nicheness("art", ["unknown"])).toBe(0.6);
+  it("rarity uses the rarest of category and labels", () => {
+    expect(rarityOf("coffee", [])).toBe(0.05);
+    expect(rarityOf("food", ["#Axe Throwing"])).toBe(0.9);
+    expect(rarityOf("art", ["unknown"])).toBe(0.6);
   });
   it("turnout is nonlinear so a small subset can't farm", () => {
     expect(turnoutPoints(4, 4)).toBe(60);
@@ -66,25 +66,25 @@ describe("factors", () => {
     expect(speedPoints({ createdAt: "2026-03-01T00:00:00Z" })).toBe(0);
     expect(speedPoints(undefined)).toBe(0);
   });
-  it("Krillion is first log of an activity in the app that month", () => {
+  it("First Bloom is first log of an activity in the app that month", () => {
     const earlier = [log({ labels: ["kayak"], date: "2026-03-02" })];
-    expect(isKrillion(log({ labels: ["Kayak"], date: "2026-03-20" }), earlier)).toBe(false);
-    expect(isKrillion(log({ labels: ["kayak"], date: "2026-04-01" }), earlier)).toBe(true);
-    expect(isKrillion(log({ labels: ["pottery"], date: "2026-03-20" }), earlier)).toBe(true);
+    expect(isFirstBloom(log({ labels: ["Kayak"], date: "2026-03-20" }), earlier)).toBe(false);
+    expect(isFirstBloom(log({ labels: ["kayak"], date: "2026-04-01" }), earlier)).toBe(true);
+    expect(isFirstBloom(log({ labels: ["pottery"], date: "2026-03-20" }), earlier)).toBe(true);
   });
   it("detects holidays", () => {
     expect(holidayFor("2026-11-26")).toBe("Thanksgiving");
     expect(holidayFor("2026-12-24")).toBe("Christmas");
     expect(holidayFor("2026-03-10")).toBeNull();
   });
-  it("totals factors, ordered niche > turnout > speed > krillion > holiday at max", () => {
+  it("totals factors, ordered rarity > turnout > speed > firstBloom > holiday at max", () => {
     const p = scoreLog(
       { cat: "water", labels: [], date: "2026-12-25", attendeeIds: ["a", "b", "c", "d"] },
       4,
       [],
       { createdAt: "2026-12-20T00:00:00Z", confirmedAt: "2026-12-20T00:00:00Z" },
     );
-    expect(p).toMatchObject({ niche: 85, turnout: 60, speed: 40, krillion: 30, holiday: 20, holidayName: "Christmas" });
+    expect(p).toMatchObject({ rarity: 85, turnout: 60, speed: 40, firstBloom: 30, holiday: 20, holidayName: "Christmas" });
     expect(p.total).toBe(235);
   });
 });
