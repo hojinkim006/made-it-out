@@ -3,7 +3,7 @@ import { useStore } from "../store";
 import { useNav, type GroupTab } from "../nav";
 import { Avatar, CatIcon, Icon } from "../components/Icons";
 import { Seg, Sheet } from "../components/Sheet";
-import { nextMilestone, Tree } from "../components/Tree";
+import { milestoneProgress, Tree } from "../components/Tree";
 import { InviteSheet, LogSheet, NewGroupSheet } from "../components/GroupSheets";
 import { boardRows, isDuo, nextStageIn } from "../lib/scoring";
 import { daysAgo, fmtD, todayISO } from "../lib/dates";
@@ -52,7 +52,7 @@ export function GroupPage() {
   const needMe = !!p && me && (!responded(p, me.id) || (p.hostId === me.id && needsHost(p).length > 0));
   const waiting = p ? waitingIds(g.memberIds, p).length : 0;
   const n = logs.length;
-  const ms = nextMilestone(n);
+  const mile = milestoneProgress(n);
   const nextStage = nextStageIn(ageDays);
 
   return (
@@ -109,10 +109,16 @@ export function GroupPage() {
               </div>
               <div className="milestone">
                 <div className="ms-text">
-                  <b>{n}</b> of {ms} hangouts <span className="muted">to the next branch milestone</span>
+                  {mile.left === 0 ? (
+                    <span>Every branch has a hangout.</span>
+                  ) : (
+                    <>
+                      <b>{mile.left}</b> {mile.left === 1 ? "hangout" : "hangouts"} <span className="muted">to the next branch</span>
+                    </>
+                  )}
                 </div>
                 <div className="bar">
-                  <i style={{ width: `${Math.min(100, (n / ms) * 100)}%` }} />
+                  <i style={{ width: `${Math.min(100, (mile.into / mile.span) * 100)}%` }} />
                 </div>
                 <div className="ms-text muted" style={{ marginTop: 8, marginBottom: 0 }}>
                   {nextStage ? `${nextStage.stage} in ${nextStage.days} days` : "Fully grown"}

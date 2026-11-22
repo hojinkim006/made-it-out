@@ -31,8 +31,17 @@ const SLOTS: { d: string; n: [number, number]; w: number }[] = [
   { d: "M400 110 Q400 80 400 46", n: [400, 46], w: 2.6 },
 ];
 export const MAX_FRUIT = SLOTS.length;
-const MILESTONES = [5, 10, 15, 20, 24];
-export const nextMilestone = (n: number) => MILESTONES.find((m) => m > n) ?? 24;
+/** A new set of branches opens every 3 hangouts. */
+const MILESTONES = [3, 6, 9, 12, 15, 18, 21];
+export const nextMilestone = (n: number) => MILESTONES.find((m) => m > n) ?? MAX_FRUIT;
+
+/** Progress toward the next branch, counted in hangouts of 3. */
+export function milestoneProgress(n: number) {
+  const next = nextMilestone(n);
+  const prev = [...MILESTONES].reverse().find((m) => m <= n) ?? 0;
+  const span = Math.max(1, next - prev);
+  return { next, prev, span, into: Math.min(span, Math.max(0, n - prev)), left: Math.max(0, next - n) };
+}
 
 /** How much the trunk thickens and the whole tree reaches, by how often the group gets out. */
 const GIRTH: Record<Health["status"], number> = {

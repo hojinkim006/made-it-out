@@ -36,6 +36,23 @@ export default function App() {
   }, [menu]);
 
   const tab = route.view === "leaderboard" ? "leaderboard" : "profile";
+  const showWelcome = supabaseConfigured && status === "ready" && !me;
+
+  if (showWelcome) {
+    return (
+      <NavCtx.Provider value={nav}>
+        <SvgDefs />
+        <AuthPage />
+        <div className="toasts" aria-live="polite">
+          {toasts.map((t) => (
+            <div className="toast" key={t.id}>
+              <Icon name="spark" /> {t.text}
+            </div>
+          ))}
+        </div>
+      </NavCtx.Provider>
+    );
+  }
 
   return (
     <NavCtx.Provider value={nav}>
