@@ -28,6 +28,24 @@ export const CATS: Record<Cat, { label: string; emoji: string; rarity: number }>
   coffee: { label: "Coffee", emoji: "☕", rarity: 0.05 },
 };
 
+const OTHER_CAT = { label: "Other", emoji: "📍", rarity: 0.3 };
+const warned = new Set<string>();
+
+/**
+ * Safe lookup for a category read from stored data. Logs saved by older app
+ * versions can carry a category this list no longer has, or none at all.
+ */
+export function catInfo(cat: string | null | undefined) {
+  const hit = CATS[cat as Cat];
+  if (hit) return hit;
+  const key = String(cat);
+  if (!warned.has(key)) {
+    warned.add(key);
+    console.warn(`Unknown log category ${JSON.stringify(cat)}; showing it as "Other".`);
+  }
+  return OTHER_CAT;
+}
+
 /**
  * Label rarity in [0, 1]. Will be replaced by pipeline output
  * (data/processed/rarity.json). Unknown labels don't change the score.

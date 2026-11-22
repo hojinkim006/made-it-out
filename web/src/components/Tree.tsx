@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { ActivityLog } from "../lib/types";
-import { CATS, STAGE_SCALE, type Health, type Stage } from "../lib/scoring";
+import { catInfo, STAGE_SCALE, type Health, type Stage } from "../lib/scoring";
 import { fmtD } from "../lib/dates";
 
 // Each slot is one branch + one fruit. Oldest memories fill the lowest, strongest branches first.
@@ -235,7 +235,7 @@ export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFrui
                     <circle className="halo" r="30" />
                     <circle className="fruit-bg" r="23" />
                     <text className="fruit-emoji" y="1">
-                      {log.emoji || CATS[log.cat].emoji}
+                      {log.emoji || catInfo(log.cat).emoji}
                     </text>
                   </g>
                 </g>
@@ -251,7 +251,7 @@ export function Tree({ logs, stage, health, mini, tone, bloomDelay = 0, showFrui
             <>
               <b>{tipLog.title}</b>
               <span>
-                {fmtD(tipLog.date, { month: "short", day: "numeric" })} · {CATS[tipLog.cat].label} · +{tipLog.points.total}
+                {fmtD(tipLog.date, { month: "short", day: "numeric" })} · {catInfo(tipLog.cat).label} · +{tipLog.points.total}
               </span>
             </>
           )}

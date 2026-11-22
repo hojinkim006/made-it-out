@@ -109,8 +109,8 @@ function Ground() {
       <path d="M0 96 Q280 88 560 96 T1200 92 V120 H0 Z" fill="#2f642c" opacity=".18" />
       {[70, 210, 360, 520, 680, 840, 1000, 1140].map((x, i) => (
         <g key={x} transform={`translate(${x} 112)`}>
-          <path d={`M0 0 C${i % 2 ? -4 : 3} -22 ${i % 2 ? -8 : 6} -36`} stroke={i % 3 ? "#3c7832" : "#68aa4c"} strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d={`M0 0 C${i % 2 ? 6 : -4} -16 ${i % 2 ? 10 : -8} -28`} stroke="#2c6228" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+          <path d={`M0 0 Q${i % 2 ? -4 : 3} -22 ${i % 2 ? -8 : 6} -36`} stroke={i % 3 ? "#3c7832" : "#68aa4c"} strokeWidth="2" fill="none" strokeLinecap="round" />
+          <path d={`M0 0 Q${i % 2 ? 6 : -4} -16 ${i % 2 ? 10 : -8} -28`} stroke="#2c6228" strokeWidth="1.6" fill="none" strokeLinecap="round" />
         </g>
       ))}
     </svg>

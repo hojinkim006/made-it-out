@@ -622,3 +622,24 @@ footer{border-top:1px solid rgba(0,0,0,.06);background:rgba(251,251,253,.6);back
   .my-rate{text-align:left}
   .budget b{font-size:22px}
 }
+
+/* Tree stage: your tree, the group's faded tree behind it, and the map. */
+.tree-toggles{position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:16px}
+.tree-toggles .chip{height:32px;padding:0 13px;font-size:13px}
+.tree-stage{position:relative}
+.tree-layer{position:relative;transition:opacity .5s var(--ease),filter .5s var(--ease),transform .5s var(--ease)}
+.tree-stage.is-map .tree-layer{opacity:0;filter:blur(6px);transform:scale(.96);pointer-events:none}
+.tree-ghost{position:absolute;inset:0;max-width:760px;margin:-6px auto 0;opacity:.26;filter:saturate(.35);transform:translate(-5%,-3%) scale(1.06);pointer-events:none;animation:ghost-in .6s var(--ease)}
+.tree-ghost .tree-wrap{margin:0 auto}
+@keyframes ghost-in{from{opacity:0}}
+.map-layer{position:absolute;inset:8px 0 12px;border-radius:20px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.1);background:var(--fill);animation:map-in .55s var(--ease) both}
+@keyframes map-in{from{opacity:0;transform:scale(1.03)}}
+.leaf-map{position:absolute;inset:0}
+.map-msg{position:absolute;inset:0;display:grid;place-items:center;padding:16px;text-align:center;color:var(--muted);font-size:14px}
+.map-leaf{display:grid;place-items:center;width:34px;height:34px;border-radius:50% 50% 50% 6px;transform:rotate(-45deg);background:#6fa84e;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.25);font-size:16px}
+.map-leaf i{transform:rotate(45deg);font-style:normal;line-height:1}
+.map-leaf.faded{background:#c9d6bf;opacity:.6}
+.map-leaf.approx{border-style:dashed}
+.map-open{margin-top:6px;border:0;border-radius:8px;padding:4px 10px;background:var(--ink);color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.map-unplaced{position:relative;text-align:center;margin:-4px 0 12px}
+@media (max-width:640px){.tree-ghost{transform:none}.map-layer{inset:4px 0 8px}}

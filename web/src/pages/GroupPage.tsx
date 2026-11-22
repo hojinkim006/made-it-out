@@ -3,7 +3,9 @@ import { useStore } from "../store";
 import { useNav, type GroupTab } from "../nav";
 import { Avatar, CatIcon, Icon } from "../components/Icons";
 import { Seg, Sheet } from "../components/Sheet";
-import { nextMilestone, Tree } from "../components/Tree";
+import { nextMilestone } from "../components/Tree";
+import { TreeStage } from "../components/TreeStage";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { InviteSheet, LogSheet, NewGroupSheet } from "../components/GroupSheets";
 import { boardRows, isDuo, nextStageIn } from "../lib/scoring";
 import { daysAgo, fmtD, todayISO } from "../lib/dates";
@@ -119,16 +121,9 @@ export function GroupPage() {
                 </div>
               </div>
             </div>
-            <Tree
-              logs={logs}
-              stage={stage}
-              health={h}
-              tone={h.status}
-              grow={route.grow}
-              highlight={hl}
-              onFruit={(i) => setOpenLog(i)}
-              onBud={() => setSheet("bud")}
-            />
+            <ErrorBoundary fallback={<p className="muted map-msg" style={{ position: "static", padding: 40 }}>The tree couldn't be drawn. The rest of the page still works; check the console for details.</p>}>
+              <TreeStage logs={logs} meId={me?.id} stage={stage} health={h} grow={route.grow} highlight={hl} onOpen={(i) => setOpenLog(i)} onBud={() => setSheet("bud")} />
+            </ErrorBoundary>
             <div className="tree-cap">
               {n ? (
                 <>
