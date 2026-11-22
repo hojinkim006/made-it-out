@@ -1,15 +1,15 @@
-"""Compute per-category nicheness scores in [0, 1].
+"""Compute per-category rarity scores in [0, 1].
 
-nicheness = 1 - log(1 + count) / log(1 + max_count)
+rarity = 1 - log(1 + count) / log(1 + max_count)
 
 Common categories (coffee) -> ~0, rare ones -> ~1. Output feeds
 web/src/lib/scoring.ts (see docs/SCORING.md).
 
 Usage:
-    python3 -m make_it_out_pipeline.nicheness \
+    python3 -m made_it_out_pipeline.rarity \
         --yelp ../data/raw/yelp/yelp_academic_dataset_business.json \
         --boston ../data/raw/boston_events.csv \
-        --out ../data/processed/nicheness.json
+        --out ../data/processed/rarity.json
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ def iter_boston_event_types(rows: Iterable[dict[str, str]], column: str) -> Iter
             yield value
 
 
-def compute_nicheness(counts: dict[str, int]) -> dict[str, float]:
+def compute_rarity(counts: dict[str, int]) -> dict[str, float]:
     if not counts:
         return {}
     max_log = math.log1p(max(counts.values()))
@@ -65,7 +65,7 @@ def main(argv: list | None = None) -> None:
     p.add_argument(
         "--boston-column", default="event_type", help="CSV column holding the event type"
     )
-    p.add_argument("--out", type=Path, default=Path("../data/processed/nicheness.json"))
+    p.add_argument("--out", type=Path, default=Path("../data/processed/rarity.json"))
     args = p.parse_args(argv)
 
     counts: Counter = Counter()
@@ -79,7 +79,7 @@ def main(argv: list | None = None) -> None:
         p.error("no input data: pass --yelp and/or --boston (see docs/DATA.md)")
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    args.out.write_text(json.dumps(compute_nicheness(counts), indent=2))
+    args.out.write_text(json.dumps(compute_rarity(counts), indent=2))
     print(f"wrote {len(counts)} categories to {args.out}")
 
 

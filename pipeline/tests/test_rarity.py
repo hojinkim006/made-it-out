@@ -1,7 +1,7 @@
 import json
 
-from make_it_out_pipeline.nicheness import (
-    compute_nicheness,
+from made_it_out_pipeline.rarity import (
+    compute_rarity,
     iter_boston_event_types,
     iter_yelp_categories,
     main,
@@ -9,13 +9,13 @@ from make_it_out_pipeline.nicheness import (
 
 
 def test_common_categories_score_low():
-    scores = compute_nicheness({"coffee": 1000, "axe throwing": 3})
+    scores = compute_rarity({"coffee": 1000, "axe throwing": 3})
     assert scores["coffee"] == 0.0
     assert 0.5 < scores["axe throwing"] < 1.0
 
 
 def test_empty_counts():
-    assert compute_nicheness({}) == {}
+    assert compute_rarity({}) == {}
 
 
 def test_yelp_parsing_and_city_filter():

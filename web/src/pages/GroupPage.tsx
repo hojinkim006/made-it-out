@@ -1,65 +1,367 @@
-import { events, groups, logs, nicheness, users } from "../data/mock";
-import { GroupTree } from "../components/GroupTree";
-import { groupScore, scoreActivity } from "../lib/scoring";
+import { useState } from "react";
+import { useStore } from "../store";
+import { useNav, type GroupTab } from "../nav";
+import { Avatar, CatIcon, Icon } from "../components/Icons";
+import { Seg, Sheet } from "../components/Sheet";
+import { nextMilestone, Tree } from "../components/Tree";
+import { InviteSheet, LogSheet, NewGroupSheet } from "../components/GroupSheets";
+import { boardRows, isDuo, nextStageIn } from "../lib/scoring";
+import { daysAgo, fmtD, todayISO } from "../lib/dates";
+import { avgRating, rateLog, spendOf } from "../lib/budget";
+import { groupInfo, since } from "../lib/groupInfo";
+import { needsHost, responded, waitingIds } from "../lib/plans";
+import { CostTag, Stars } from "../components/Stars";
+import type { ActivityLog, Plan } from "../lib/types";
+import { COMPETITORS } from "../data/seed";
+import { TryNext } from "../components/TryNext";
+import { NextUp, VotesTab } from "./Votes";
 
-const nameOf = (id: string) => users.find((u) => u.id === id)?.name ?? id;
-const fmt = (iso: string) => new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+const fmtN = (n: number) => n.toLocaleString("en-US");
 
-export function GroupPage({ groupId }: { groupId: string }) {
-  const group = groups.find((g) => g.id === groupId);
-  if (!group) return <p>Group not found.</p>;
-  const groupLogs = logs.filter((l) => l.groupId === group.id).sort((a, b) => a.date.localeCompare(b.date));
-  const groupEvents = events.filter((e) => e.groupId === group.id && e.status === "open");
+export function GroupPage() {
+  const { me, state, board, myGroups, nameOf } = useStore();
+  const { route, go } = useNav();
+  const [sheet, setSheet] = useState<"invite" | "new" | "bud" | null>(null);
+  const [openLog, setOpenLog] = useState<number | null>(null);
+  const [hl, setHl] = useState<number | null>(null);
+
+  const g = myGroups.find((x) => x.id === route.groupId) ?? myGroups[0];
+  if (!g) {
+    return (
+      <div className="card pad-lg empty">
+        <h2>No groups yet.</h2>
+        <p>Add friends by username on your profile, then plant your first tree.</p>
+        <button className="btn btn-primary sm" onClick={() => setSheet("new")}>
+          <Icon name="plus" /> Create a group
+        </button>
+        {sheet === "new" && <NewGroupSheet onClose={() => setSheet(null)} />}
+      </div>
+    );
+  }
+
+  const info = groupInfo(state, g);
+  const { logs, score, stage, ageDays } = info;
+  const h = score.health;
+  const duo = isDuo(g);
+  const rows = duo
+    ? boardRows("duos", board.groups, board.logs, COMPETITORS.duos, {})
+    : boardRows("local", board.groups, board.logs, COMPETITORS.local, { region: g.region });
+  const rank = rows.find((r) => r.id === g.id)?.rank;
+  const tab: GroupTab = route.tab ?? "overview";
+  const p = g.plan;
+  const needMe = !!p && me && (!responded(p, me.id) || (p.hostId === me.id && needsHost(p).length > 0));
+  const waiting = p ? waitingIds(g.memberIds, p).length : 0;
+  const n = logs.length;
+  const ms = nextMilestone(n);
+  const nextStage = nextStageIn(ageDays);
 
   return (
-    <section>
-      <div className="group-header">
-        <GroupTree group={group} logs={logs} />
+    <>
+      <div className="crumbs">
+        <button onClick={() => go("profile")}>Your groups</button>
+        <span>/</span>
+        <span>{g.name}</span>
+      </div>
+      <div className="page-head">
         <div>
-          <h1>{group.name}</h1>
-          <p className="muted">📍 {group.location}</p>
-          <p className="points">{groupScore(group.id, logs, events, nicheness)} pts</p>
-          <p className="muted">{group.memberIds.map(nameOf).join(", ")}</p>
+          <h1>{g.name}</h1>
+          <p className="sub">
+            {g.memberIds.length} friends · {g.hood} · Growing together since {since(g)}
+          </p>
+        </div>
+        <div className="row gap">
+          <button className="btn btn-secondary" onClick={() => setSheet("invite")}>
+            <Icon name="person" /> Invite friends
+          </button>
+          <button className="btn btn-primary" onClick={() => go("plan", { groupId: g.id })}>
+            <Icon name="plus" /> Post an event
+          </button>
         </div>
       </div>
+      <div className="gswitch">
+        {myGroups.map((x) => (
+          <button key={x.id} className={`chip${x.id === g.id ? " on" : ""}`} onClick={() => go("group", { groupId: x.id, tab })}>
+            {x.name}
+          </button>
+        ))}
+        <button className="chip ghost" onClick={() => setSheet("new")}>
+          <Icon name="plus" /> New group
+        </button>
+      </div>
+      <div className="subtabs">
+        <Seg
+          value={tab}
+          onChange={(t) => go("group", { groupId: g.id, tab: t })}
+          options={[
+            { key: "overview", label: "Overview" },
+            { key: "votes", label: <>Votes{needMe ? <span className="dotb" /> : p && !p.confirmedOptionId && waiting > 0 ? ` · ${waiting}` : ""}</> },
+          ]}
+        />
+      </div>
 
-      <h2>Upcoming events</h2>
-      {groupEvents.length === 0 && <p className="muted">No open events. Propose one!</p>}
-      {groupEvents.map((e) => (
-        <div key={e.id} className="card">
-          <h3>{e.title} @ {e.place}</h3>
-          <p>{fmt(e.proposedTime)}</p>
-          <ul className="votes">
-            {e.votes.map((v) => (
-              <li key={v.userId}>
-                {nameOf(v.userId)}: {v.choice === "yes" ? "✅ in" : v.choice === "no" ? "❌ out" : `🕒 suggests ${fmt(v.altTime!)}`}
-              </li>
-            ))}
-          </ul>
-          {/* TODO(M3): vote buttons + confirm */}
-        </div>
-      ))}
-
-      <h2>Log history</h2>
-      <ul className="log-list">
-        {groupLogs.map((l, i) => {
-          const s = scoreActivity(l, groupLogs.slice(0, i), nicheness);
-          return (
-            <li key={l.id} className="card log">
-              <span className="log-emoji">{l.emoji}</span>
+      {tab === "votes" ? (
+        <VotesTab g={g} />
+      ) : (
+        <>
+          <section className="card tree-card">
+            <div className="tree-top">
               <div>
-                <strong>{l.placeName}</strong> <span className="muted">· {l.category}</span>
-                <p className="muted">{l.date} · {l.attendeeIds.map(nameOf).join(", ")}</p>
+                <div className="eyebrow">Your group tree</div>
+                <div className="stage">{stage}</div>
+                <div className="health">
+                  <span className={`badge ${h.status === "Thriving" || h.status === "Healthy" ? "green" : h.status === "Quiet" || h.status === "New" ? "soft" : h.status === "Wilting" ? "amber" : "red"}`}>
+                    <Icon name="leaf" size={12} /> {h.status}
+                  </span>
+                  {h.weeklyStreak >= 2 && <span className="badge soft">{h.weeklyStreak}-week streak</span>}
+                  {h.dailyStreak >= 2 && <span className="badge soft">{h.dailyStreak}-day streak</span>}
+                  {h.decay > 0 && <span className="badge red">−{h.decay} pts decay</span>}
+                </div>
               </div>
-              <span className="points">
-                +{s.total}
-                {s.holiday && <small> 🎉 {s.holiday}</small>}
+              <div className="milestone">
+                <div className="ms-text">
+                  <b>{n}</b> of {ms} outings <span className="muted">to the next branch milestone</span>
+                </div>
+                <div className="bar">
+                  <i style={{ width: `${Math.min(100, (n / ms) * 100)}%` }} />
+                </div>
+                <div className="ms-text muted" style={{ marginTop: 8, marginBottom: 0 }}>
+                  {nextStage ? `${nextStage.stage} in ${nextStage.days} days` : "Fully grown"}
+                </div>
+              </div>
+            </div>
+            <Tree
+              logs={logs}
+              stage={stage}
+              health={h}
+              grow={route.grow}
+              highlight={hl}
+              onFruit={(i) => setOpenLog(i)}
+              onBud={() => setSheet("bud")}
+            />
+            <div className="tree-cap">
+              {n ? (
+                <>
+                  <h3>{h.leaves > 0 ? "Rooted in good company." : h.shrink < 1 ? "This tree misses you." : "Time to get out again."}</h3>
+                  <p className="muted">
+                    {n} {n === 1 ? "memory" : "memories"} · {h.leaves} green {h.leaves === 1 ? "leaf" : "leaves"}. Streaks add leaves; quiet weeks take them away.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h3>Plant the first seed.</h3>
+                  <p className="muted">Log your first outing and a branch will grow.</p>
+                </>
+              )}
+            </div>
+            <div className="tree-stats">
+              <div>
+                <b>{fmtN(score.total)}</b>
+                <span>Group points</span>
+              </div>
+              <div>
+                <b>#{rank}</b>
+                <span>{duo ? "In Duos" : `In ${g.region.split(",")[0]}`}</span>
+              </div>
+              <div>
+                <b>{n}</b>
+                <span>Outings logged</span>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid-2">
+            <div className="stack">
+              <NextUp g={g} />
+              <HowWasIt logs={logs} onOpen={setOpenLog} />
+              <BudgetCard logs={logs} plan={p} />
+              <TryNext g={g} />
+              <section className="card pad">
+                <div className="card-head">
+                  <div>
+                    <h2>The whole crew</h2>
+                    <p className="muted">Everyone who helps this tree grow.</p>
+                  </div>
+                  <button className="link" onClick={() => setSheet("invite")}>
+                    <Icon name="plus" /> Invite
+                  </button>
+                </div>
+                <div className="crew">
+                  {g.memberIds.map((m) => {
+                    const c = logs.filter((l) => l.attendeeIds.includes(m)).length;
+                    const pts = logs.filter((l) => l.authorId === m).reduce((a, l) => a + l.points.total, 0);
+                    return (
+                      <div className="crew-row" key={m}>
+                        <Avatar name={nameOf(m)} me={m === me!.id} />
+                        <span className="nm">
+                          {m === me!.id ? me!.displayName : nameOf(m)}
+                          {m === me!.id && <span className="muted"> (you)</span>}
+                          {p?.hostId === m && <span className="tag"> Host</span>}
+                        </span>
+                        <span className="muted">
+                          {c} {c === 1 ? "outing" : "outings"} · {fmtN(pts)} pts
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
+            <section className="card pad">
+              <div className="card-head">
+                <div>
+                  <h2>The memory trail</h2>
+                  <p className="muted">Every outing, every branch.</p>
+                </div>
+                <button className="btn btn-soft sm" onClick={() => go("log", { groupId: g.id })}>
+                  <Icon name="plus" /> Log activity
+                </button>
+              </div>
+              {n ? (
+                <div className="trail">
+                  {[...logs].reverse().map((l) => {
+                    const i = logs.indexOf(l);
+                    return (
+                      <button key={l.id} className="trail-item" onClick={() => setOpenLog(i)} onMouseEnter={() => setHl(i)} onMouseLeave={() => setHl(null)}>
+                        <span className="ico">
+                          <CatIcon cat={l.cat} />
+                        </span>
+                        <span className="t">
+                          <b>{l.title}</b>
+                          <span className="muted">
+                            {fmtD(l.date, { month: "short", day: "numeric" })} · {l.where.split("·")[0].trim() || "—"} · {l.attendeeIds.length} friends
+                            {avgRating(l.ratings) != null && (
+                              <>
+                                {" "}
+                                · <span className="gold">★</span> {avgRating(l.ratings)!.toFixed(1)}
+                              </>
+                            )}
+                            {l.comments.length > 0 && ` · ${l.comments.length} ${l.comments.length === 1 ? "comment" : "comments"}`}
+                            {l.labels.length > 0 && ` · ${l.labels.map((t) => "#" + t).join(" ")}`}
+                            {l.media.length > 0 && ` · ${l.media.length} 📷`}
+                          </span>
+                        </span>
+                        <span className="pts">+{l.points.total}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="empty">
+                  <p>No memories yet. Your first outing grows your first branch.</p>
+                  <button className="btn btn-primary sm" onClick={() => go("log", { groupId: g.id })}>
+                    Log an outing
+                  </button>
+                </div>
+              )}
+            </section>
+          </div>
+        </>
+      )}
+
+      {sheet === "invite" && <InviteSheet groupId={g.id} onClose={() => setSheet(null)} />}
+      {sheet === "new" && <NewGroupSheet onClose={() => setSheet(null)} />}
+      {sheet === "bud" && (
+        <Sheet onClose={() => setSheet(null)}>
+          <div className="sheet-hero">
+            <span className="ico" style={{ background: "var(--fill)", color: "var(--ink)" }}>
+              <Icon name="spark" />
+            </span>
+            <h2>A branch is waiting.</h2>
+            <p className="meta">This spot on your tree fills in with your next outing.</p>
+          </div>
+          <button className="btn btn-primary block" onClick={() => go("log", { groupId: g.id })}>
+            Log an outing <Icon name="arrow" />
+          </button>
+        </Sheet>
+      )}
+      {openLog !== null && <LogSheet logs={logs} index={openLog} onClose={() => setOpenLog(null)} onNav={setOpenLog} />}
+    </>
+  );
+}
+
+function HowWasIt({ logs, onOpen }: { logs: ActivityLog[]; onOpen: (i: number) => void }) {
+  const { me, update, toast } = useStore();
+  if (!me) return null;
+  const today = todayISO();
+  const cutoff = daysAgo(21);
+  const rows = logs
+    .map((l, i) => ({ l, i }))
+    .filter(({ l }) => l.attendeeIds.includes(me.id) && !l.ratings[me.id] && l.date >= cutoff && l.date <= today)
+    .reverse()
+    .slice(0, 3);
+  if (!rows.length) return null;
+  return (
+    <section className="card pad">
+      <div className="card-head">
+        <div>
+          <h2>How was it?</h2>
+          <p className="muted">Your ratings shape the group's suggestions.</p>
+        </div>
+      </div>
+      <div className="rate-list">
+        {rows.map(({ l, i }) => {
+          const avg = avgRating(l.ratings);
+          return (
+            <div className="rate-item" key={l.id}>
+              <span className="ico">
+                <CatIcon cat={l.cat} />
               </span>
-            </li>
+              <button className="t" onClick={() => onOpen(i)}>
+                <b>{l.title}</b>
+                <span className="muted">
+                  {fmtD(l.date, { month: "short", day: "numeric" })}
+                  {avg != null && ` · group ${avg.toFixed(1)}★`}
+                </span>
+              </button>
+              <Stars
+                small
+                value={0}
+                onRate={(n) => {
+                  update((s) => rateLog(s, l.id, me.id, n));
+                  toast(`Rated ${n}★`);
+                }}
+              />
+            </div>
           );
         })}
-      </ul>
-      {/* TODO(M2): "Log an activity" form (place via Google Maps, date, attendees) */}
+      </div>
     </section>
   );
 }
+
+function BudgetCard({ logs, plan }: { logs: ActivityLog[]; plan: Plan | null }) {
+  const { me } = useStore();
+  if (!me) return null;
+  const spent = spendOf(logs, me.id);
+  return (
+    <section className="card pad">
+      <div className="card-head">
+        <div>
+          <h2>Budget</h2>
+          <p className="muted">What getting out has cost, per person.</p>
+        </div>
+      </div>
+      <div className="budget">
+        <div>
+          <b>
+            {spent.est ? "~" : ""}${Math.round(spent.mine)}
+          </b>
+          <span>
+            You, last 30 days · {spent.n} {spent.n === 1 ? "outing" : "outings"}
+          </span>
+        </div>
+        <div>
+          <b>~${Math.round(spent.avg)}</b>
+          <span>Group average per outing</span>
+        </div>
+      </div>
+      {plan && (
+        <p className="hint-line">
+          Next up: {plan.title} <CostTag item={plan} />
+        </p>
+      )}
+      <p className="hint-line">Prices people entered count as-is. Everything else uses the estimate: Gemini when GEMINI_API_KEY is set, otherwise a built-in price list.</p>
+    </section>
+  );
+}
+
