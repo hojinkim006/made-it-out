@@ -6,7 +6,7 @@ import { daysAgo, nextFriday, parseD, iso } from "../lib/dates";
 import { estCost } from "../lib/budget";
 import { optLabel } from "../lib/plans";
 
-export const STATE_VERSION = 4;
+export const STATE_VERSION = 7;
 
 const users: User[] = [
   {
@@ -56,11 +56,42 @@ const users: User[] = [
     region: "Boston, MA",
     friendIds: ["david", "andrew"],
   },
+  {
+    id: "priya",
+    username: "priya",
+    email: "priya@example.com",
+    phone: "(617) 555-0106",
+    displayName: "Priya",
+    region: "Boston, MA",
+    friendIds: ["andrew"],
+  },
+  {
+    id: "sam",
+    username: "sam",
+    email: "sam@example.com",
+    phone: "(617) 555-0107",
+    displayName: "Sam",
+    region: "Boston, MA",
+    friendIds: ["andrew"],
+  },
+  {
+    id: "elena",
+    username: "elena",
+    email: "elena@example.com",
+    phone: "(617) 555-0108",
+    displayName: "Elena",
+    region: "Boston, MA",
+    friendIds: ["andrew"],
+  },
 ];
 
 const SQ = ["hojin", "david", "andrew", "matt"];
 const SB = ["david", "john", "andrew"];
 const NO = ["hojin", "matt"];
+const RIVER = ["andrew", "hojin", "david", "matt", "john", "priya", "sam", "elena"];
+const SUN = ["andrew", "david", "john"];
+const AFTER = ["andrew", "hojin", "matt"];
+const BENCH = ["andrew", "john"];
 
 type RawLog = [
   group: string,
@@ -96,6 +127,10 @@ const RAW: RawLog[] = [
   ["no", "matt", 35, "Escape room", "games", ["escape-room"], "Trapology · Downtown", NO, "Escaped with 40 seconds left."],
   ["no", "hojin", 12, "Late-night pho", "food", ["restaurant"], "Pho Pasteur · Chinatown", NO, "The only thing open after midnight."],
   ["no", "matt", 5, "Axe throwing", "sports", ["axe-throwing"], "Urban Axes · Somerville", NO, "Hojin hit a bullseye on the first throw and never again."],
+  ["su", "david", 4, "Eggs and a long table", "food", ["brunch"], "The Friendly Toast · Allston", SUN, "Nobody looked at a clock."],
+  ["ah", "hojin", 11, "Member preview", "art", ["museum", "gallery"], "ICA · Seaport", AFTER, "Stayed until the guards started hovering."],
+  ["ob", "andrew", 80, "First thaw", "outdoors", ["walk"], "Public Garden", BENCH, "The swan boats were still in storage."],
+  ["ob", "john", 48, "One last warm afternoon", "coffee", ["park"], "Boston Common", BENCH, "The bench by the pond was free, for once."],
 ];
 
 function pastPlan(id: string, groupId: string, byId: string, logDaysAgo: number, hoursToConfirm: number): Plan {
@@ -226,6 +261,52 @@ export function seed(now = new Date()): State {
       hood: "Chinatown",
       createdAt: daysAgo(60, now),
       memberIds: NO,
+      plan: null,
+      pastPlans: [],
+      feed: [],
+    },
+    {
+      id: "rv",
+      name: "River Rats",
+      region: "Boston, MA",
+      hood: "Cambridge",
+      createdAt: daysAgo(12, now),
+      memberIds: RIVER,
+      plan: null,
+      pastPlans: [],
+      feed: [],
+    },
+    {
+      id: "su",
+      name: "Sunday Table",
+      region: "Boston, MA",
+      hood: "Brookline",
+      school: "Boston University",
+      createdAt: daysAgo(110, now),
+      memberIds: SUN,
+      plan: null,
+      pastPlans: [],
+      feed: [],
+    },
+    {
+      id: "ah",
+      name: "After Hours",
+      region: "Boston, MA",
+      hood: "Seaport",
+      school: "Boston University",
+      createdAt: daysAgo(60, now),
+      memberIds: AFTER,
+      plan: null,
+      pastPlans: [],
+      feed: [],
+    },
+    {
+      id: "ob",
+      name: "The Old Bench",
+      region: "Boston, MA",
+      hood: "Boston",
+      createdAt: daysAgo(250, now),
+      memberIds: BENCH,
       plan: null,
       pastPlans: [],
       feed: [],

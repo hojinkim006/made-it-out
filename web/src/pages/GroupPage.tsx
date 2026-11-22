@@ -3,7 +3,7 @@ import { useStore } from "../store";
 import { useNav, type GroupTab } from "../nav";
 import { Avatar, CatIcon, Icon } from "../components/Icons";
 import { Seg, Sheet } from "../components/Sheet";
-import { nextMilestone, Tree } from "../components/Tree";
+import { milestoneProgress, Tree } from "../components/Tree";
 import { InviteSheet, LogSheet, NewGroupSheet } from "../components/GroupSheets";
 import { boardRows, isDuo, nextStageIn } from "../lib/scoring";
 import { daysAgo, fmtD, todayISO } from "../lib/dates";
@@ -52,13 +52,13 @@ export function GroupPage() {
   const needMe = !!p && me && (!responded(p, me.id) || (p.hostId === me.id && needsHost(p).length > 0));
   const waiting = p ? waitingIds(g.memberIds, p).length : 0;
   const n = logs.length;
-  const ms = nextMilestone(n);
+  const mile = milestoneProgress(n);
   const nextStage = nextStageIn(ageDays);
 
   return (
     <>
       <div className="crumbs">
-        <button onClick={() => go("profile")}>Your groups</button>
+        <button onClick={() => go("profile")}>Your trees</button>
         <span>/</span>
         <span>{g.name}</span>
       </div>
@@ -77,16 +77,6 @@ export function GroupPage() {
             <Icon name="plus" /> Post an event
           </button>
         </div>
-      </div>
-      <div className="gswitch">
-        {myGroups.map((x) => (
-          <button key={x.id} className={`chip${x.id === g.id ? " on" : ""}`} onClick={() => go("group", { groupId: x.id, tab })}>
-            {x.name}
-          </button>
-        ))}
-        <button className="chip ghost" onClick={() => setSheet("new")}>
-          <Icon name="plus" /> New group
-        </button>
       </div>
       <div className="subtabs">
         <Seg
@@ -119,10 +109,16 @@ export function GroupPage() {
               </div>
               <div className="milestone">
                 <div className="ms-text">
-                  <b>{n}</b> of {ms} outings <span className="muted">to the next branch milestone</span>
+                  {mile.left === 0 ? (
+                    <span>Every branch has a hangout.</span>
+                  ) : (
+                    <>
+                      <b>{mile.left}</b> {mile.left === 1 ? "hangout" : "hangouts"} <span className="muted">to the next branch</span>
+                    </>
+                  )}
                 </div>
                 <div className="bar">
-                  <i style={{ width: `${Math.min(100, (n / ms) * 100)}%` }} />
+                  <i style={{ width: `${Math.min(100, (mile.into / mile.span) * 100)}%` }} />
                 </div>
                 <div className="ms-text muted" style={{ marginTop: 8, marginBottom: 0 }}>
                   {nextStage ? `${nextStage.stage} in ${nextStage.days} days` : "Fully grown"}
@@ -133,6 +129,7 @@ export function GroupPage() {
               logs={logs}
               stage={stage}
               health={h}
+              tone={h.status}
               grow={route.grow}
               highlight={hl}
               onFruit={(i) => setOpenLog(i)}
@@ -143,13 +140,13 @@ export function GroupPage() {
                 <>
                   <h3>{h.leaves > 0 ? "Rooted in good company." : h.shrink < 1 ? "This tree misses you." : "Time to get out again."}</h3>
                   <p className="muted">
-                    {n} {n === 1 ? "memory" : "memories"} · {h.leaves} green {h.leaves === 1 ? "leaf" : "leaves"}. Streaks add leaves; quiet weeks take them away.
+                    {n} {n === 1 ? "hangout" : "hangouts"} · {h.leaves} green {h.leaves === 1 ? "leaf" : "leaves"}. Streaks add leaves; quiet weeks take them away.
                   </p>
                 </>
               ) : (
                 <>
                   <h3>Plant the first seed.</h3>
-                  <p className="muted">Log your first outing and a branch will grow.</p>
+                  <p className="muted">Log your first hangout and a branch will grow.</p>
                 </>
               )}
             </div>
@@ -164,7 +161,7 @@ export function GroupPage() {
               </div>
               <div>
                 <b>{n}</b>
-                <span>Outings logged</span>
+                <span>Hangouts logged</span>
               </div>
             </div>
           </section>
@@ -198,7 +195,7 @@ export function GroupPage() {
                           {p?.hostId === m && <span className="tag"> Host</span>}
                         </span>
                         <span className="muted">
-                          {c} {c === 1 ? "outing" : "outings"} · {fmtN(pts)} pts
+                          {c} {c === 1 ? "hangout" : "hangouts"} · {fmtN(pts)} pts
                         </span>
                       </div>
                     );
@@ -209,11 +206,11 @@ export function GroupPage() {
             <section className="card pad">
               <div className="card-head">
                 <div>
-                  <h2>The memory trail</h2>
-                  <p className="muted">Every outing, every branch.</p>
+                  <h2>Hangouts</h2>
+                  <p className="muted">Every hangout, every branch.</p>
                 </div>
                 <button className="btn btn-soft sm" onClick={() => go("log", { groupId: g.id })}>
-                  <Icon name="plus" /> Log activity
+                  <Icon name="plus" /> Log a hangout
                 </button>
               </div>
               {n ? (
@@ -247,9 +244,9 @@ export function GroupPage() {
                 </div>
               ) : (
                 <div className="empty">
-                  <p>No memories yet. Your first outing grows your first branch.</p>
+                  <p>No hangouts yet. Your first one grows your first branch.</p>
                   <button className="btn btn-primary sm" onClick={() => go("log", { groupId: g.id })}>
-                    Log an outing
+                    Log a hangout
                   </button>
                 </div>
               )}
@@ -267,10 +264,10 @@ export function GroupPage() {
               <Icon name="spark" />
             </span>
             <h2>A branch is waiting.</h2>
-            <p className="meta">This spot on your tree fills in with your next outing.</p>
+            <p className="meta">This spot on your tree fills in with your next hangout.</p>
           </div>
           <button className="btn btn-primary block" onClick={() => go("log", { groupId: g.id })}>
-            Log an outing <Icon name="arrow" />
+            Log a hangout <Icon name="arrow" />
           </button>
         </Sheet>
       )}
@@ -347,12 +344,12 @@ function BudgetCard({ logs, plan }: { logs: ActivityLog[]; plan: Plan | null }) 
             {spent.est ? "~" : ""}${Math.round(spent.mine)}
           </b>
           <span>
-            You, last 30 days · {spent.n} {spent.n === 1 ? "outing" : "outings"}
+            You, last 30 days · {spent.n} {spent.n === 1 ? "hangout" : "hangouts"}
           </span>
         </div>
         <div>
           <b>~${Math.round(spent.avg)}</b>
-          <span>Group average per outing</span>
+          <span>Group average per hangout</span>
         </div>
       </div>
       {plan && (
