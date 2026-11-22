@@ -20,7 +20,6 @@ export function AuthPage() {
   return (
     <div className="auth">
       <section className="card auth-hero">
-        <div className="eyebrow">Less group chat. More good stories.</div>
         <h1>made it out.</h1>
         <p className="sub">Plan hangouts in one place, log what you did, and watch your group's tree grow.</p>
         <div className="gprev">
