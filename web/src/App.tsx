@@ -10,9 +10,10 @@ import { PlanPage } from "./pages/PlanPage";
 import { LogPage } from "./pages/LogPage";
 import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { EditProfileSheet, SettingsSheet } from "./pages/AccountSheets";
+import { supabaseConfigured } from "./supabase";
 
 export default function App() {
-  const { me, toasts, reset, signOut } = useStore();
+  const { me, status, error, reload, toasts, signOut, recovery, endRecovery } = useStore();
   const [route, setRoute] = useState<Route>({ view: "profile" });
   const [menu, setMenu] = useState(false);
   const [sheet, setSheet] = useState<"settings" | "edit" | null>(null);
@@ -47,7 +48,7 @@ export default function App() {
                 <path d="M12 21v-9M12 12l-4-4M12 14l4-4M12 9V4" />
               </svg>
             </span>
-            <span>make it out.</span>
+            <span>made it out.</span>
           </button>
           <nav className="nav-center">
             {me && (
@@ -87,7 +88,7 @@ export default function App() {
                     <button role="menuitem" onClick={() => (setSheet("settings"), setMenu(false))}>
                       <Icon name="gear" /> Settings
                     </button>
-                    <button role="menuitem" onClick={() => (signOut(), setMenu(false))}>
+                    <button role="menuitem" onClick={() => (void signOut(), setMenu(false))}>
                       <Icon name="out" /> Sign out
                     </button>
                   </div>
@@ -100,7 +101,32 @@ export default function App() {
 
       <main className="wrap">
         <section className="view active" key={me ? `${route.view}-${animKey}` : "auth"}>
-          {!me ? (
+          {!supabaseConfigured ? (
+            <section className="card pad-lg">
+              <h2>Almost there.</h2>
+              <p className="sub">
+                Add <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_PUBLISHABLE_KEY</code> to <code>web/.env.local</code>, then restart{" "}
+                <code>npm run dev</code>.
+              </p>
+            </section>
+          ) : status === "loading" ? (
+            <section className="card pad-lg">
+              <p className="muted">Loading…</p>
+            </section>
+          ) : status === "error" ? (
+            <section className="card pad-lg">
+              <h2>Couldn't load your data.</h2>
+              <p className="err-text">{error}</p>
+              <div className="row gap mt">
+                <button className="btn btn-primary sm" onClick={() => void reload()}>
+                  Try again
+                </button>
+                <button className="btn btn-secondary sm" onClick={() => void signOut()}>
+                  Sign out
+                </button>
+              </div>
+            </section>
+          ) : !me ? (
             <AuthPage />
           ) : route.view === "profile" ? (
             <ProfilePage />
@@ -120,14 +146,7 @@ export default function App() {
         <div className="foot">
           <span>Less group chat. More good stories.</span>
           <span>
-            Places © OpenStreetMap contributors · Boston · Demo data{" "}
-            <button
-              onClick={() => {
-                if (confirm("Reset all demo data in every open window?")) reset();
-              }}
-            >
-              Reset demo
-            </button>
+            Places © OpenStreetMap contributors · Boston
           </span>
         </div>
       </footer>
@@ -140,7 +159,8 @@ export default function App() {
         ))}
       </div>
 
-      {me && sheet === "settings" && <SettingsSheet onClose={() => setSheet(null)} />}
+      {/* A password-reset link signs you in; Settings opens to set a new password. */}
+      {me && (sheet === "settings" || recovery) && <SettingsSheet onClose={() => (setSheet(null), endRecovery())} />}
       {me && sheet === "edit" && <EditProfileSheet onClose={() => setSheet(null)} />}
     </NavCtx.Provider>
   );

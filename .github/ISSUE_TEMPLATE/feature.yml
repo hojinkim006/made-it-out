@@ -12,7 +12,7 @@ body:
         - Leaderboard tab
         - Activity logging
         - Event proposals / voting
-        - Scoring (nicheness, bonuses)
+        - Scoring (rarity, bonuses)
         - Data pipeline (Yelp, Boston events, Maps)
         - Infra / CI
     validations:

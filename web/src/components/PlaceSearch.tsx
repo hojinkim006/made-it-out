@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { nichePercentile, searchSpots, type PlaceData, type Spot } from "../lib/places";
+import { rarityPercentile, searchSpots, type PlaceData, type Spot } from "../lib/places";
 import { todayISO } from "../lib/dates";
 
 /** Location field that searches real Boston places and events, or takes free text. */
@@ -78,7 +78,7 @@ export function PlaceSearch({
                   {s.date ? ` · ${s.date}` : ""}
                 </span>
               </span>
-              <NicheTag niche={s.niche} data={data!} />
+              <RarityTag rarity={s.rarity} data={data!} />
             </button>
           ))}
         </div>
@@ -87,12 +87,12 @@ export function PlaceSearch({
   );
 }
 
-export function NicheTag({ niche, data }: { niche: number; data: PlaceData }) {
-  const pct = nichePercentile(data, niche);
+export function RarityTag({ rarity, data }: { rarity: number; data: PlaceData }) {
+  const pct = rarityPercentile(data, rarity);
   const cls = pct >= 90 ? "" : " soft";
   return (
-    <span className={`badge${cls}`} title={`Nicheness ${niche.toFixed(2)}: rarer than ${pct}% of Boston spots`}>
-      {pct >= 50 ? `Top ${Math.max(1, 100 - pct)}% niche` : "Classic"}
+    <span className={`badge${cls}`} title={`Rarity ${rarity.toFixed(2)}: rarer than ${pct}% of Boston spots`}>
+      {pct >= 50 ? `Top ${Math.max(1, 100 - pct)}% rare` : "Classic"}
     </span>
   );
 }

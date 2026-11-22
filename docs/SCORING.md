@@ -8,13 +8,13 @@ Factors, largest share of points first:
 
 | # | Factor | Max | How it works |
 |---|---|---|---|
-| 1 | Nicheness | +100 | `100 × nicheness`. If a real place/event is picked, its dataset score (Yelp + OSM, or Boston events) replaces the self-picked category's. Labels can raise it (scores from `web/public/data/nicheness.json`). See [DATA.md](DATA.md#how-nicheness-is-computed). |
+| 1 | Rarity | +100 | `100 × rarity`. If a real place/event is picked, its dataset score (Yelp + OSM, or Boston events) replaces the self-picked category's. Labels can raise it (scores from `web/public/data/rarity.json`). See [DATA.md](DATA.md#how-rarity-is-computed). |
 | 2 | Group turnout | +60 | `60 × (attendees / members)²`. Nonlinear, so 2 of 8 people earn 4, not 15. |
 | 3 | Finalization speed | +40 | Only for logs linked to a plan: `40 × (1 − hours from posted to locked in / 72)`. |
-| 4 | Krillion bonus | +30 | Nobody in the whole app has logged this activity yet this calendar month. The activity is the log's first label, else its category. |
+| 4 | First Bloom bonus | +30 | Nobody in the whole app has logged this activity yet this calendar month. The activity is the log's first label, else its category. |
 | 5 | Holiday bonus | +20 | Christmas week, New Year, Thanksgiving, Halloween, July 4, Valentine's Day, St. Patrick's Day. |
 
-Points are computed when the log is saved and stored on it (Krillion depends on what existed at that moment).
+Points are computed when the log is saved and stored on it (First Bloom depends on what existed at that moment).
 
 ## Group score
 

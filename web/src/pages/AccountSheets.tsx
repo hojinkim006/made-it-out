@@ -1,29 +1,36 @@
 import { useState } from "react";
 import { useStore } from "../store";
-import { digits, hashPassword, REGIONS, schoolForEmail } from "../lib/auth";
+import { digits, REGIONS, schoolForEmail } from "../lib/auth";
+import { supabase } from "../supabase";
 import { Sheet } from "../components/Sheet";
 import { Icon } from "../components/Icons";
 
 export function EditProfileSheet({ onClose }: { onClose: () => void }) {
-  const { me, state, update, toast } = useStore();
+  const { me, saveProfile, toast } = useStore();
   const [name, setName] = useState(me!.displayName);
   const [email, setEmail] = useState(me!.email);
   const [phone, setPhone] = useState(me!.phone);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const save = () => {
-    const others = state.users.filter((u) => u.id !== me!.id);
+  const save = async () => {
     if (!name.trim()) return setErr("Add your name");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setErr("Enter a valid email");
-    if (others.some((u) => u.email.toLowerCase() === email.toLowerCase())) return setErr("That email is already in use");
     if (digits(phone).length < 10) return setErr("Enter a 10-digit phone number");
-    if (others.some((u) => digits(u.phone) === digits(phone))) return setErr("That phone is already in use");
-    update((s) => {
-      const u = s.users.find((x) => x.id === me!.id)!;
-      u.displayName = name.trim();
-      u.email = email.trim();
-      u.phone = phone.trim();
-    });
+    setBusy(true);
+    const problem = await saveProfile({ displayName: name, ...(digits(phone) !== me!.phone ? { phone } : {}) });
+    if (problem) {
+      setBusy(false);
+      return setErr(problem);
+    }
+    if (email.trim().toLowerCase() !== me!.email.toLowerCase()) {
+      const { error } = await supabase.auth.updateUser({ email: email.trim() }, { emailRedirectTo: window.location.origin });
+      setBusy(false);
+      if (error) return setErr(/registered|exists/i.test(error.message) ? "That email is already in use" : error.message);
+      toast(`Profile saved. Confirm the new email from the link sent to ${email.trim()}.`);
+      return onClose();
+    }
+    setBusy(false);
     toast("Profile updated");
     onClose();
   };
@@ -50,48 +57,47 @@ export function EditProfileSheet({ onClose }: { onClose: () => void }) {
         <input className="field" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
         {err && <span className="err-text">{err}</span>}
       </label>
-      <button className="btn btn-primary block" onClick={save}>
-        Save changes
+      <button className="btn btn-primary block" onClick={save} disabled={busy}>
+        {busy ? "Saving…" : "Save changes"}
       </button>
     </Sheet>
   );
 }
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
-  const { me, update, toast, signOut } = useStore();
+  const { me, saveProfile, toast, signOut, recovery, endRecovery } = useStore();
   const [region, setRegion] = useState(me!.region);
   const [schoolEmail, setSchoolEmail] = useState(me!.schoolEmail ?? "");
   const [cur, setCur] = useState("");
   const [next, setNext] = useState("");
   const [err, setErr] = useState("");
 
-  const saveRegion = (r: string) => {
+  const saveRegion = async (r: string) => {
     setRegion(r);
-    update((s) => {
-      s.users.find((u) => u.id === me!.id)!.region = r;
-    });
+    const problem = await saveProfile({ region: r });
+    if (problem) return setErr(problem);
     toast(`Leaderboard region set to ${r}`);
   };
 
-  const verify = () => {
+  const verify = async () => {
     const school = schoolForEmail(schoolEmail);
     if (!school) return setErr("Use a supported university email, e.g. you@bu.edu");
     setErr("");
-    update((s) => {
-      const u = s.users.find((x) => x.id === me!.id)!;
-      u.school = school;
-      u.schoolEmail = schoolEmail.trim();
-    });
+    const problem = await saveProfile({ school, schoolEmail });
+    if (problem) return setErr(problem);
     toast(`Verified: ${school}`);
   };
 
   const changePw = async () => {
-    if ((await hashPassword(me!.username, cur)) !== me!.passHash) return setErr("Current password is wrong");
     if (next.length < 6) return setErr("New password needs at least 6 characters");
-    const h = await hashPassword(me!.username, next);
-    update((s) => {
-      s.users.find((u) => u.id === me!.id)!.passHash = h;
-    });
+    if (!recovery) {
+      // Check the current password by signing in with it again.
+      const { error } = await supabase.auth.signInWithPassword({ email: me!.email, password: cur });
+      if (error) return setErr("Current password is wrong");
+    }
+    const { error } = await supabase.auth.updateUser({ password: next });
+    if (error) return setErr(error.message);
+    endRecovery();
     setCur("");
     setNext("");
     setErr("");
@@ -125,12 +131,12 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
             Verify
           </button>
         </div>
-        <p className="hint">Demo: verifies by email domain, no code is sent. Unlocks your school's sub-leaderboard.</p>
+        <p className="hint">Checks the email domain (no code is sent yet). Unlocks your school's sub-leaderboard.</p>
       </div>
       <div className="f">
-        <span>Change password</span>
+        <span>{recovery ? "Set a new password" : "Change password"}</span>
         <div className="f2">
-          <input className="field" type="password" placeholder="Current" value={cur} onChange={(e) => setCur(e.target.value)} />
+          {!recovery && <input className="field" type="password" placeholder="Current" value={cur} onChange={(e) => setCur(e.target.value)} />}
           <input className="field" type="password" placeholder="New" value={next} onChange={(e) => setNext(e.target.value)} />
         </div>
         <button className="btn btn-soft sm mt" onClick={changePw}>
@@ -139,7 +145,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
       </div>
       {err && <p className="err-text">{err}</p>}
       <div className="sheet-nav">
-        <button className="btn btn-secondary sm" onClick={() => (signOut(), onClose())}>
+        <button className="btn btn-secondary sm" onClick={() => (void signOut(), onClose())}>
           <Icon name="out" /> Sign out
         </button>
         <button className="btn btn-primary sm" onClick={onClose}>

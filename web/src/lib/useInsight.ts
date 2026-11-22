@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { estCost } from "./budget";
 import { guessPeople, guessTag, type PlanInsight } from "./insight";
+import { supabase } from "../supabase";
 
 export interface InsightState extends PlanInsight {
   /** "gemini" when the live model answered, "local" for the keyword fallback. */
@@ -11,7 +12,7 @@ export interface InsightState extends PlanInsight {
 }
 
 const cache = new Map<string, PlanInsight>();
-/** Set once the server says Gemini isn't configured, so we stop asking. */
+/** Set once the Edge Function is missing or has no Gemini key, so we stop asking. */
 let offline = false;
 
 function local(title: string, where: string, groupSize: number): (PlanInsight & { priced: boolean }) | null {
@@ -40,17 +41,13 @@ export function usePlanInsight(title: string, where: string, groupSize: number, 
     const ctl = new AbortController();
     const timer = setTimeout(() => {
       setLive({ key, data: null, loading: true });
-      fetch("/api/plan-insight", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, where, groupSize }),
-        signal: ctl.signal,
-      })
-        .then((r) => {
-          if (r.status === 503) offline = true;
-          return r;
+      // Supabase Edge Function "plan-insight" (supabase/functions/plan-insight). Sends the user's session token.
+      supabase.functions
+        .invoke<PlanInsight>("plan-insight", { body: { title, where, groupSize }, signal: ctl.signal })
+        .then(({ data, error, response }) => {
+          if (response?.status === 503 || response?.status === 404) offline = true;
+          return error || !data ? Promise.reject(error ?? new Error("empty")) : data;
         })
-        .then((r) => (r.ok ? (r.json() as Promise<PlanInsight>) : Promise.reject(new Error(String(r.status)))))
         .then((data) => {
           cache.set(key, data);
           setLive({ key, data, loading: false });

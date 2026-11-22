@@ -3,14 +3,14 @@ import io
 import json
 from datetime import date
 
-from make_it_out_pipeline.app_data import (
+from made_it_out_pipeline.app_data import (
     build_events,
     build_places,
     classify_event,
     label,
+    log_rarity,
     main,
     neighborhood,
-    rarity,
     yelp_category_counts,
 )
 
@@ -36,7 +36,7 @@ def place(i, category, cuisine=None, lat=42.35, lon=-71.08):
 
 
 def test_rarity_and_label():
-    r = rarity({"common": 1000, "rare": 1})
+    r = log_rarity({"common": 1000, "rare": 1})
     assert r["common"] == 0.0 and r["rare"] > 0.8
     assert label("Bowling Alley") == "bowling-alley"
 
@@ -57,8 +57,8 @@ def test_places_rare_beats_common_and_cuisine_used():
     out, table = build_places(places, YELP)
     by = {p["id"]: p for p in out}
     assert "node/103" not in by
-    assert by["node/101"]["niche"] > by["node/0"]["niche"]
-    assert by["node/100"]["niche"] > by["node/0"]["niche"]
+    assert by["node/101"]["rarity"] > by["node/0"]["rarity"]
+    assert by["node/100"]["rarity"] > by["node/0"]["rarity"]
     assert by["node/100"]["labels"] == ["restaurant", "ramen"]
     assert by["node/101"]["cat"] == "sports"
     assert table["axe-throwing"] > table["restaurant"]
@@ -127,7 +127,7 @@ def test_events_window_and_filters():
     events, table = build_events(rs, today, 90, 60)
     assert [e["name"] for e in events] == ["Block Party", "Jazz Night"]
     assert events[1]["where"] == "1 City Hall Pz"
-    assert all(0.65 <= e["niche"] <= 1 for e in events)
+    assert all(0.65 <= e["rarity"] <= 1 for e in events)
     assert "concert" in table
 
 
@@ -162,7 +162,7 @@ def test_main_writes_files(tmp_path):
     data = json.loads((out / "places.json").read_text())
     assert len(data["places"]) == 2 and data["sources"]
     assert json.loads((out / "events.json").read_text())["events"][0]["type"] == "festival"
-    assert "bowling-alley" in json.loads((out / "nicheness.json").read_text())["labels"]
+    assert "bowling-alley" in json.loads((out / "rarity.json").read_text())["labels"]
 
 
 def test_dining_is_damped_below_equally_rare_activity():
@@ -170,4 +170,4 @@ def test_dining_is_damped_below_equally_rare_activity():
     places += [place(10 + i, "park") for i in range(30)]
     out, _ = build_places(places, {"Restaurants": 50000, "Ramen": 190, "Bowling": 190})
     by = {p["id"]: p for p in out}
-    assert 0 < by["node/1"]["niche"] < by["node/2"]["niche"]
+    assert 0 < by["node/1"]["rarity"] < by["node/2"]["rarity"]

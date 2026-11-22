@@ -3,9 +3,9 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "make-it-out-pipeline"
+name = "made-it-out-pipeline"
 version = "0.1.0"
-description = "Turns Yelp / Boston event datasets into nicheness scores for Make It Out"
+description = "Turns Yelp / Boston event datasets into rarity scores for Made It Out"
 requires-python = ">=3.8"
 dependencies = []
 

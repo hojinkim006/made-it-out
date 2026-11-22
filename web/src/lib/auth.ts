@@ -1,35 +1,8 @@
 import type { User } from "./types";
 
-/**
- * Demo-only auth. Accounts live in the browser's localStorage, so this is NOT
- * secure: swap for a real backend (Supabase/Firebase auth) before launch.
- */
-export async function hashPassword(username: string, password: string): Promise<string> {
-  const bytes = new TextEncoder().encode(`${username.toLowerCase()}:${password}`);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
+/** Sign-up and profile rules. Accounts and passwords live in Supabase Auth. */
 
 export const digits = (s: string) => s.replace(/\D/g, "");
-
-/** Find a user by email, username or phone number. */
-export function findUser(users: User[], identifier: string): User | undefined {
-  const id = identifier.trim().toLowerCase().replace(/^@/, "");
-  if (!id) return undefined;
-  const phone = digits(id);
-  return users.find(
-    (u) =>
-      u.email.toLowerCase() === id ||
-      u.username.toLowerCase() === id ||
-      (phone.length >= 7 && digits(u.phone).endsWith(phone.slice(-10))),
-  );
-}
-
-export async function login(users: User[], identifier: string, password: string): Promise<User | null> {
-  const user = findUser(users, identifier);
-  if (!user) return null;
-  return (await hashPassword(user.username, password)) === user.passHash ? user : null;
-}
 
 export const USERNAME_RE = /^[a-z0-9_.]{3,20}$/;
 
@@ -57,7 +30,7 @@ export function validateSignUp(users: User[], f: SignUpInput): Partial<Record<ke
   return e;
 }
 
-/** University verification by .edu email. Demo: no code is actually sent. */
+/** University verification by .edu email domain. No code is sent yet. */
 export const SCHOOLS: Record<string, string> = {
   "bu.edu": "Boston University",
   "mit.edu": "MIT",

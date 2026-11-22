@@ -3,14 +3,14 @@ import { useStore } from "../store";
 import { useNav } from "../nav";
 import { Seg } from "./Sheet";
 import { Icon } from "./Icons";
-import { NicheTag } from "./PlaceSearch";
+import { RarityTag } from "./PlaceSearch";
 import { CATS, normLabel } from "../lib/scoring";
 import { fmtD, todayISO } from "../lib/dates";
 import { suggestPlaces, upcomingEvents, usePlaceData, type Spot } from "../lib/places";
 import type { Cat, Group } from "../lib/types";
 
 /**
- * "Try something new": niche Boston spots this group hasn't logged yet, and
+ * "Try something new": rare Boston spots this group hasn't logged yet, and
  * upcoming one-off city events. Picking one prefills a plan.
  */
 export function TryNext({ g, onPick }: { g: Group; onPick?: (s: Spot) => void }) {
@@ -60,7 +60,7 @@ export function TryNext({ g, onPick }: { g: Group; onPick?: (s: Spot) => void })
         value={tab}
         onChange={setTab}
         options={[
-          { key: "spots", label: "Niche spots" },
+          { key: "spots", label: "Rare spots" },
           { key: "events", label: "Happening soon" },
         ]}
       />
@@ -84,14 +84,14 @@ export function TryNext({ g, onPick }: { g: Group; onPick?: (s: Spot) => void })
               {s.date ? `${fmtD(s.date, { weekday: "short", month: "short", day: "numeric" })} · ` : ""}
               {s.kindLabel} · {s.hood}
             </span>
-            <NicheTag niche={s.niche} data={data} />
+            <RarityTag rarity={s.rarity} data={data} />
           </span>
           <button className="btn btn-soft sm" onClick={() => choose(s)}>
             {onPick ? "Use" : "Plan it"}
           </button>
         </div>
       ))}
-      <p className="attrib">Places © OpenStreetMap contributors · nicheness uses Yelp Open Dataset category counts · events: City of Boston.</p>
+      <p className="attrib">Places © OpenStreetMap contributors · rarity uses Yelp Open Dataset category counts · events: City of Boston.</p>
     </section>
   );
 }

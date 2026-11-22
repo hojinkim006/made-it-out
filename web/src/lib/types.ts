@@ -5,7 +5,6 @@ export interface User {
   username: string; // unique, used to add friends
   email: string;
   phone: string;
-  passHash: string; // sha256("username:password"), demo only, not real security
   displayName: string;
   region: string; // e.g. "Boston, MA", picks the local leaderboard
   school?: string; // set once university email is verified
@@ -18,14 +17,14 @@ export type Cat = "water" | "art" | "food" | "music" | "outdoors" | "coffee" | "
 export interface Media {
   id: ID;
   kind: "image" | "video";
-  url: string; // data URL (demo storage)
+  url: string; // Supabase Storage public URL (a data URL while the log form is open)
 }
 
 export interface PointBreakdown {
-  niche: number;
+  rarity: number;
   turnout: number;
   speed: number;
-  krillion: number;
+  firstBloom: number;
   holiday: number;
   holidayName: string | null;
   total: number;
